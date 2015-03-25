@@ -71,7 +71,7 @@ namespace Mono.TextEditor.Utils
 			if (!File.Exists (path))
 				return false;
 
-			XmlDataSerializer serializer = new XmlDataSerializer (new DataContext ());
+			BinaryDataSerializer serializer = new BinaryDataSerializer (new DataContext ());
 			settings = (Settings)serializer.Deserialize (path, typeof(Settings));
 			return true;
 		}
@@ -89,7 +89,7 @@ namespace Mono.TextEditor.Utils
 
 				Directory.CreateDirectory (Path.GetDirectoryName (path));
 
-				XmlDataSerializer serializer = new XmlDataSerializer (new DataContext ());
+				BinaryDataSerializer serializer = new BinaryDataSerializer (new DataContext ());
 				serializer.Serialize (path, settings);
 			}
 			settingStore [contentName] = settings;
