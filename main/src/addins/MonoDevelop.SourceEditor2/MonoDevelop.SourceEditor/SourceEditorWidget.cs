@@ -465,7 +465,7 @@ namespace MonoDevelop.SourceEditor
 			return result;
 		}
 		HashSet<string> symbols = new HashSet<string> ();
-		bool reloadSettings;
+		public bool ReloadSettings;
 		
 		void HandleParseInformationUpdaterWorkerThreadDoWork (bool firstTime, ParsedDocument parsedDocument, CancellationToken token = default(CancellationToken))
 		{
@@ -551,8 +551,8 @@ namespace MonoDevelop.SourceEditor
 				}
 				doc.UpdateFoldSegments (foldSegments, false, true, token);
 
-				if (reloadSettings) {
-					reloadSettings = false;
+				if (ReloadSettings & !firstTime) {
+					ReloadSettings = false;
 					Application.Invoke (delegate {
 						if (isDisposed)
 							return;
@@ -1138,7 +1138,7 @@ namespace MonoDevelop.SourceEditor
 					return;
 
 				view.StoreSettings ();
-				reloadSettings = true;
+				ReloadSettings = true;
 				view.Load (view.ContentName, view.SourceEncoding, true);
 				view.WorkbenchWindow.ShowNotification = false;
 			} catch (Exception ex) {

@@ -66,6 +66,7 @@ namespace Mono.TextEditor
 		bool ShowIconMargin { get; set; }
 		bool ShowLineNumberMargin { get; set; }
 		bool ShowFoldMargin { get; set; }
+		bool EnableFoldPersistence { get; set; }
 		bool HighlightCaretLine { get; set; }
 		int RulerColumn { get; set; }
 		bool ShowRuler { get; set; }
