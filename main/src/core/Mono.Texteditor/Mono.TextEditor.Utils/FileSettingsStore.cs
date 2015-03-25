@@ -25,20 +25,27 @@
 // THE SOFTWARE.
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+using MonoDevelop.Core;
+using MonoDevelop.Core.Serialization;
+
 
 namespace Mono.TextEditor.Utils
 {
 	public static class FileSettingsStore
 	{
-		
+
 		public class Settings
 		{
-			public int CaretOffset { get; set; }
-
-			public double vAdjustment { get; set; }
-
-			public double hAdjustment { get; set; }
-
+			[ItemProperty]
+			public int CaretOffset;
+			[ItemProperty]
+			public double vAdjustment;
+			[ItemProperty]
+			public double hAdjustment;
+			[ItemProperty]
 			public Dictionary<int, bool> FoldingStates = new Dictionary<int, bool> ();
 
 			public override string ToString ()
@@ -49,25 +56,62 @@ namespace Mono.TextEditor.Utils
 
 		static Dictionary<string, Settings> settingStore = new Dictionary<string, Settings> ();
 
-		public static bool TryGetValue (string contentName, out Settings settings)
+		public static bool TryGetValue (string contentName, out Settings settings, bool persist)
 		{
 			if (contentName == null)
 				throw new ArgumentNullException ("contentName");
-			return settingStore.TryGetValue (contentName, out settings);
+			if (settingStore.TryGetValue (contentName, out settings))
+				return true;
+			if (!persist)
+				return false;
+
+			FilePath root = UserProfile.Current.CacheDir.Combine ("FileSettingsStore");
+			FilePath path = root + contentName + ".fss";
+
+			if (!File.Exists (path))
+				return false;
+
+			XmlDataSerializer serializer = new XmlDataSerializer (new DataContext ());
+			settings = (Settings)serializer.Deserialize (path, typeof(Settings));
+			return true;
 		}
 
-		public static void Store (string contentName, Settings settings)
+		public static void Store (string contentName, Settings settings, bool persist)
 		{
 			if (contentName == null)
 				throw new ArgumentNullException ("contentName");
 			if (settings == null)
 				throw new ArgumentNullException ("settings");
+
+			if (persist) {
+				FilePath root = UserProfile.Current.CacheDir.Combine ("FileSettingsStore");
+				FilePath path = root + contentName + ".fss";
+
+				Directory.CreateDirectory (Path.GetDirectoryName (path));
+
+				XmlDataSerializer serializer = new XmlDataSerializer (new DataContext ());
+				serializer.Serialize (path, settings);
+			}
 			settingStore [contentName] = settings;
 		}
 
-		public static void Remove (string fileName)
+		public static void Remove (string contentName)
 		{
-			settingStore.Remove (fileName);
+			FilePath root = UserProfile.Current.CacheDir.Combine ("FileSettingsStore");
+			FilePath path = root + contentName + ".fss";
+			if (!File.Exists (path))
+				return;
+			path.Delete ();
+			DirectoryInfo dir = new DirectoryInfo (Path.GetDirectoryName (path));
+			while(dir.ToString () != root)
+			{
+				if(dir.EnumerateFiles ().Any () || dir.EnumerateDirectories ().Any ())
+					return;
+				dir.Delete ();
+				dir = dir.Parent;
+			}
+			
+			settingStore.Remove (contentName);
 		}
 	}
 }

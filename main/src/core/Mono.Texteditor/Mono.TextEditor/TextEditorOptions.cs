@@ -50,6 +50,7 @@ namespace Mono.TextEditor
 		bool showIconMargin = true;
 		bool showLineNumberMargin = true;
 		bool showFoldMargin = true;
+		bool enableFoldPersistence = true;
 		IndentStyle indentStyle = IndentStyle.Virtual;
 		
 		int  rulerColumn = 80;
@@ -283,6 +284,17 @@ namespace Mono.TextEditor
 			}
 		}
 
+		public virtual bool EnableFoldPersistence {
+			get {
+				return enableFoldPersistence;
+			}
+			set {
+				if (enableFoldPersistence != value) {
+					enableFoldPersistence = value;
+					OnChanged (EventArgs.Empty);
+				}
+			}
+		}
 		public virtual bool HighlightCaretLine {
 			get {
 				return highlightCaretLine;

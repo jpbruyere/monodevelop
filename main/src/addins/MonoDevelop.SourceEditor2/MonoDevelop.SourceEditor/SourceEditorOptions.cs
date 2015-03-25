@@ -151,6 +151,9 @@ namespace MonoDevelop.SourceEditor
 				case "ShowFoldMargin":
 					base.ShowFoldMargin = (bool)args.NewValue;
 					break;
+				case "EnableFoldPersistence":
+					base.EnableFoldPersistence = (bool)args.NewValue;
+					break;
 				case "HighlightCaretLine":
 					base.HighlightCaretLine = (bool)args.NewValue;
 					break;
@@ -212,6 +215,7 @@ namespace MonoDevelop.SourceEditor
 			this.indentStyle = PropertyService.Get ("IndentStyle", IndentStyle.Smart);
 			base.ShowLineNumberMargin = PropertyService.Get ("ShowLineNumberMargin", true);
 			base.ShowFoldMargin = PropertyService.Get ("ShowFoldMargin", false);
+			base.EnableFoldPersistence = PropertyService.Get ("EnableFoldPersistence", false);
 			base.HighlightCaretLine = PropertyService.Get ("HighlightCaretLine", false);
 			base.HighlightMatchingBracket = PropertyService.Get ("HighlightMatchingBracket", true);
 			base.ShowRuler = PropertyService.Get ("ShowRuler", false);
@@ -564,7 +568,12 @@ namespace MonoDevelop.SourceEditor
 				base.ShowFoldMargin = value;
 			}
 		}
-		
+		public override bool EnableFoldPersistence {
+			set {
+				PropertyService.Set ("EnableFoldPersistence", value);
+				base.EnableFoldPersistence = value;
+			}
+		}
 		public override bool HighlightCaretLine {
 			set {
 				PropertyService.Set ("HighlightCaretLine", value);
