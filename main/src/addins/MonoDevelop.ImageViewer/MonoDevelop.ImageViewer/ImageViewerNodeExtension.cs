@@ -44,7 +44,7 @@ namespace MonoDevelop.ImageViewer
 		
 		public override bool CanBuildNode (Type dataType)
 		{
-			return typeof(ProjectFile).IsAssignableFrom (dataType);
+			return true;//typeof(ProjectFile).IsAssignableFrom (dataType);
 		}
 	}
 	

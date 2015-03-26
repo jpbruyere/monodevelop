@@ -7,7 +7,8 @@
 	<Extension path = "/MonoDevelop/Ide/DisplayBindings">
 		<DisplayBinding
 			id = "ImageViewer"
-			class = "MonoDevelop.HexEditor.ImageViewerDisplayBinding" />
+			insertafter ="AssemblyBrowser"
+			class = "MonoDevelop.ImageViewer.ImageViewerDisplayBinding" />
 	</Extension>
 	<!--
 	<Extension path = "/MonoDevelop/Ide/Pads/ProjectPad">
