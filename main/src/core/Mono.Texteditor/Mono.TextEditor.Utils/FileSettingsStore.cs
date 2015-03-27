@@ -122,11 +122,13 @@ namespace Mono.TextEditor.Utils
 
 		public static void CacheCleanUp(bool deleteAll = false)
 		{
-			if (deleteAll)
+			if (deleteAll){
 				Directory.Delete (root, true);
-
+				return;
+			}
 			if (!Directory.Exists (root))
 				return;
+
 			string[] files = Directory.GetFiles (root, "*.fss", System.IO.SearchOption.AllDirectories);
 			List<FileInfo> list = new List<FileInfo> ();
 			foreach (string s in files)
