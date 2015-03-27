@@ -878,7 +878,8 @@ namespace MonoDevelop.SourceEditor
 			ContentName = fileName;
 			lastSaveTimeUtc = File.GetLastWriteTimeUtc (ContentName);
 			RunFirstTimeFoldUpdate (text);
-			widget.TextEditor.Caret.Offset = 0;
+			// TODO: Check if not useless to have it init to 0
+			widget.TextEditor.Caret.SetOffset(0,true);
 			UpdateExecutionLocation ();
 			UpdateBreakpoints ();
 			UpdatePinnedWatches ();
@@ -905,15 +906,20 @@ namespace MonoDevelop.SourceEditor
 			if (widget == null || string.IsNullOrEmpty (ContentName) || 
 				!FileSettingsStore.TryGetValue (ContentName, out settings, TextEditor.Options.EnableFoldPersistence))
 				return;
-			
-			widget.TextEditor.Caret.Offset = settings.CaretOffset;
-			widget.TextEditor.VAdjustment.Value = settings.vAdjustment;
-			widget.TextEditor.HAdjustment.Value = settings.hAdjustment;
-			
+
+			if (!widget.TextEditor.Caret.OffsetReloadingNotAllowed) {
+				widget.TextEditor.Caret.SetOffset (settings.CaretOffset, true);
+				widget.TextEditor.VAdjustment.Value = settings.vAdjustment;
+				widget.TextEditor.HAdjustment.Value = settings.hAdjustment;
+			}
+
+
 			foreach (var f in widget.TextEditor.Document.FoldSegments) {
 				bool isFolded;
-				if (settings.FoldingStates.TryGetValue (f.Offset, out isFolded))
-					f.IsFolded = isFolded;
+				if (settings.FoldingStates.TryGetValue (f.Offset, out isFolded)) {
+					//leave opened where caret has been set
+					f.IsFolded = isFolded & !f.Contains(widget.TextEditor.Caret.Offset);
+				}
 			}
 		}
 		
