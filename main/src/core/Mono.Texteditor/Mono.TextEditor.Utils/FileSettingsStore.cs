@@ -36,6 +36,7 @@ namespace Mono.TextEditor.Utils
 {
 	public static class FileSettingsStore
 	{
+		const long MaxCacheSize = 1048576;//1MB
 
 		public class Settings
 		{
@@ -56,6 +57,10 @@ namespace Mono.TextEditor.Utils
 
 		static Dictionary<string, Settings> settingStore = new Dictionary<string, Settings> ();
 
+		static FilePath root {
+			get { return UserProfile.Current.CacheDir.Combine ("FileSettingsStore"); }
+		}
+
 		public static bool TryGetValue (string contentName, out Settings settings, bool persist)
 		{
 			if (contentName == null)
@@ -65,7 +70,6 @@ namespace Mono.TextEditor.Utils
 			if (!persist)
 				return false;
 
-			FilePath root = UserProfile.Current.CacheDir.Combine ("FileSettingsStore");
 			FilePath path = root + contentName + ".fss";
 
 			if (!File.Exists (path))
@@ -88,7 +92,6 @@ namespace Mono.TextEditor.Utils
 				throw new ArgumentNullException ("settings");
 
 			if (persist) {
-				FilePath root = UserProfile.Current.CacheDir.Combine ("FileSettingsStore");
 				FilePath path = root + contentName + ".fss";
 
 				Directory.CreateDirectory (Path.GetDirectoryName (path));
@@ -101,7 +104,6 @@ namespace Mono.TextEditor.Utils
 
 		public static void Remove (string contentName)
 		{
-			FilePath root = UserProfile.Current.CacheDir.Combine ("FileSettingsStore");
 			FilePath path = root + contentName + ".fss";
 			if (!File.Exists (path))
 				return;
@@ -116,6 +118,34 @@ namespace Mono.TextEditor.Utils
 			}
 			
 			settingStore.Remove (contentName);
+		}
+
+		public static void CacheCleanUp(bool deleteAll = false)
+		{
+			if (deleteAll)
+				Directory.Delete (root, true);
+
+			if (!Directory.Exists (root))
+				return;
+			string[] files = Directory.GetFiles (root, "*.fss", System.IO.SearchOption.AllDirectories);
+			List<FileInfo> list = new List<FileInfo> ();
+			foreach (string s in files)
+				list.Add (new FileInfo (s));
+
+			list = list.OrderBy (l => l.LastAccessTimeUtc).ToList();
+
+			do {
+				long cacheSize = 0;
+				foreach (FileInfo f in list)
+					cacheSize += f.Length;
+				if (MaxCacheSize > cacheSize){
+					FileInfo f = list.FirstOrDefault ();
+					Remove (f.FullName);
+					list.Remove(f);
+				}
+				else
+					break;
+			} while (list.Count > 0);
 		}
 	}
 }

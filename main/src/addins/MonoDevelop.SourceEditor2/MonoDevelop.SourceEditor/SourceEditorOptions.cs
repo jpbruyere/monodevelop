@@ -153,6 +153,8 @@ namespace MonoDevelop.SourceEditor
 					break;
 				case "EnableFoldPersistence":
 					base.EnableFoldPersistence = (bool)args.NewValue;
+					if (!base.EnableFoldPersistence)
+						Mono.TextEditor.Utils.FileSettingsStore.CacheCleanUp(true);
 					break;
 				case "HighlightCaretLine":
 					base.HighlightCaretLine = (bool)args.NewValue;

@@ -111,6 +111,10 @@ namespace MonoDevelop.Ide.Gui
 				FileService.FileRenamed += FileEditCacheClean;
 				FileService.FileMoved += FileEditCacheClean;
 
+				IdeApp.Exited += delegate(object o, EventArgs args) {
+					Mono.TextEditor.Utils.FileSettingsStore.CacheCleanUp();
+				};
+
 				pads = null;	// Make sure we get an up to date pad list.
 				monitor.Step (1);
 			} finally {
