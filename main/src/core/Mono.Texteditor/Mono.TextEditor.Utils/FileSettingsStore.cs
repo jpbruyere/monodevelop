@@ -70,6 +70,10 @@ namespace Mono.TextEditor.Utils
 
 			if (!File.Exists (path))
 				return false;
+			if (File.GetLastWriteTimeUtc (contentName) > File.GetLastWriteTimeUtc (path)) {
+				Remove (contentName);
+				return false;
+			}
 
 			BinaryDataSerializer serializer = new BinaryDataSerializer (new DataContext ());
 			settings = (Settings)serializer.Deserialize (path, typeof(Settings));
