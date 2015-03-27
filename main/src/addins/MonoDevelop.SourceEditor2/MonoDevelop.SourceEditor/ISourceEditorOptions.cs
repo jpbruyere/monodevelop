@@ -57,6 +57,7 @@ namespace MonoDevelop.SourceEditor
 		bool EnableAutoCodeCompletion {get; }
 		bool DefaultRegionsFolding {get; }
 		bool DefaultCommentFolding {get; }
+		bool DefaultImportsFolding {get; }
 		bool EnableSemanticHighlighting {get; }
 		//public bool AutoInsertTemplates {get; }
 		bool TabIsReindent {get; }

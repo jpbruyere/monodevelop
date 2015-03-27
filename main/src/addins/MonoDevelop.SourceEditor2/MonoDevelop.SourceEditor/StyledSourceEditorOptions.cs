@@ -322,6 +322,10 @@ namespace MonoDevelop.SourceEditor
 			get { return DefaultSourceEditorOptions.Instance.DefaultRegionsFolding; }
 		}
 
+		public bool DefaultImportsFolding {
+			get { return DefaultSourceEditorOptions.Instance.DefaultImportsFolding; }
+		}
+
 		public EditorFontType EditorFontType {
 			get { return DefaultSourceEditorOptions.Instance.EditorFontType; }
 		}

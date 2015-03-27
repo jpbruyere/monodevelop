@@ -46,6 +46,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		{
 			this.foldingCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowFoldMargin;
 			this.foldPersistenceCheckbutton.Active = DefaultSourceEditorOptions.Instance.EnableFoldPersistence;
+			this.foldImportsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultImportsFolding;
 			this.foldregionsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultRegionsFolding;
 			this.foldCommentsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultCommentFolding;
 			//			wordWrapCheckbutton.Active = DefaultSourceEditorOptions.Instance.WrapLines;
@@ -65,6 +66,7 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 				HighlightingPanel.UpdateActiveDocument ();
 			}
 			DefaultSourceEditorOptions.Instance.EnableFoldPersistence = this.foldPersistenceCheckbutton.Active;
+			DefaultSourceEditorOptions.Instance.DefaultImportsFolding = this.foldImportsCheckbutton.Active;
 //			DefaultSourceEditorOptions.Instance.WrapLines = wordWrapCheckbutton.Active;
 		}
 

@@ -81,6 +81,7 @@ namespace MonoDevelop.Ide.TypeSystem
 		CommentInsideMember,
 		UserRegion,
 		Type,
-		Member
+		Member,
+		Using
 	}
 }
