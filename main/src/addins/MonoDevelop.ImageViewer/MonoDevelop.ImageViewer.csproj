@@ -22,7 +22,11 @@
     <ConsolePause>false</ConsolePause>
     <CustomCommands>
       <CustomCommands>
-        <Command type="AfterBuild" command="sudo cp -fr /mnt/data2/src/monodevelop/main/build/AddIns/DisplayBindings/ImageViewer /opt/lib/monodevelop/AddIns/DisplayBindings/" />
+        <Command type="Execute" command="../../../build/bin/MonoDevelop.exe" workingdir="../../../build/bin/">
+          <EnvironmentVariables>
+            <Variable name="MONODEVELOP_DEV_ADDINS" value="${TargetDir}" />
+          </EnvironmentVariables>
+        </Command>
       </CustomCommands>
     </CustomCommands>
   </PropertyGroup>

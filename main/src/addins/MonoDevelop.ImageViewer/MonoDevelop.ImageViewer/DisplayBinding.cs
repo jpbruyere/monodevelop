@@ -28,6 +28,7 @@ using System.IO;
 using MonoDevelop.Core;
 using MonoDevelop.Ide.Gui;
 using MonoDevelop.Projects;
+using System.Globalization;
 
 namespace MonoDevelop.ImageViewer
 {
@@ -44,12 +45,14 @@ namespace MonoDevelop.ImageViewer
 			
 			return new ImageViewer ();
 		}
-		
+		bool canHandle = false;
 		public bool CanHandle (FilePath fileName, string mimeType, Project ownerProject)
 		{
-			return true;
+			//canHandle = mimeType.StartsWith ("image/");
+			return true;// canHandle;
 		}
 		
-		public bool CanUseAsDefault { get { return false; } }
+		public bool CanUseAsDefault 
+		{ get { return false; } }
 	}
 }

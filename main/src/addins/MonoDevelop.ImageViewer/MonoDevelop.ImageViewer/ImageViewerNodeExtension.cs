@@ -27,8 +27,11 @@
 using System;
 using MonoDevelop.Projects;
 using MonoDevelop.Ide.Gui.Components;
+using MonoDevelop.Components;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Ide;
+using Xwt.Drawing;
+using Xwt;
 
 namespace MonoDevelop.ImageViewer
 {
@@ -37,14 +40,26 @@ namespace MonoDevelop.ImageViewer
 	}
 	
 	class ImageViewerNodeExtension : NodeBuilderExtension
-	{
+	{		
 		public override Type CommandHandlerType {
 			get { return typeof(ImageViewerCommandHandler); }
 		}
 		
 		public override bool CanBuildNode (Type dataType)
+		{			
+			return typeof(ProjectFile).IsAssignableFrom (dataType);
+		}
+		public override void BuildNode (ITreeBuilder treeBuilder, object dataObject, NodeInfo nodeInfo)
 		{
-			return true;//typeof(ProjectFile).IsAssignableFrom (dataType);
+			ProjectFile pf   = dataObject as ProjectFile;
+
+			Image i;
+			if (pf != null) {				
+				i = Image.FromFile (pf.FilePath);
+				nodeInfo.Icon = i.Scale (16.0 / i.Width, 16.0 / i.Height);;
+			}
+
+			base.BuildNode (treeBuilder, dataObject, nodeInfo);
 		}
 	}
 	
@@ -53,8 +68,9 @@ namespace MonoDevelop.ImageViewer
 		[CommandHandler (Commands.ShowImageViewer)]
 		protected void OnShowImageViewer () 
 		{
+
 			ImageViewer view = new ImageViewer ();
-			
+
 			ProjectFile file   = CurrentNode.DataItem as ProjectFile;
 			if (file != null)
 				view.Load (file.FilePath);

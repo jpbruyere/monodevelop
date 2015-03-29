@@ -4,17 +4,16 @@
 		<Command id = "MonoDevelop.HexEditor.Commands.ShowHexEditor" _label = "Open with _hex editor" />
 	</Extension> -->
 
-	<Extension path = "/MonoDevelop/Ide/DisplayBindings">
+	<Extension path = "/MonoDevelop/Ide/DisplayBindings">			
 		<DisplayBinding
 			id = "ImageViewer"
 			insertafter ="AssemblyBrowser"
-			class = "MonoDevelop.ImageViewer.ImageViewerDisplayBinding" />
+			class = "MonoDevelop.ImageViewer.ImageViewerDisplayBinding" />							
+	</Extension>
+	<Extension path = "/MonoDevelop/Ide/Pads/ProjectPad">
+		<NodeBuilder id = "ImageViewerNodeExtension" class = "MonoDevelop.ImageViewer.ImageViewerNodeExtension"/>
 	</Extension>
 	<!--
-	<Extension path = "/MonoDevelop/Ide/Pads/ProjectPad">
-		<NodeBuilder id = "HexEditorNodeExtension" class = "MonoDevelop.HexEditor.HexEditorNodeExtension"/>
-	</Extension>
-
 	<Extension path = "/MonoDevelop/Ide/ContextMenu/ProjectPad/Tools">
 		<Condition id="ItemType" value="ProjectFile">
 			<CommandItem id = "MonoDevelop.HexEditor.Commands.ShowHexEditor" insertafter="FindInFilesSeparator" insertbefore="CombineOptionsSeparator"/>
@@ -24,5 +23,8 @@
 	<Extension path="/MonoDevelop/Debugging/ValueVisualizers">
 		<Type class="MonoDevelop.HexEditor.HexEditorVisualizer" />
 	</Extension>
+		<Condition id="FileType" fileExtensions=".svg">
+			<NodeBuilder id = "ImageViewerNodeExtension" class = "MonoDevelop.ImageViewer.ImageViewerNodeExtension"/>
+		</Condition>
 	-->
 </ExtensionModel>

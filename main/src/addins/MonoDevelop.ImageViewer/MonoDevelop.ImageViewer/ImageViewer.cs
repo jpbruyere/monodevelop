@@ -30,14 +30,22 @@ using MonoDevelop.Ide.Gui;
 using MonoDevelop.Ide.Gui.Content;
 using Xwt;
 using MonoDevelop.Ide.Fonts;
+using Mono.Addins;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
+using Xwt.Drawing;
 
 namespace MonoDevelop.ImageViewer
 {
-	class ImageViewer : AbstractXwtViewContent
+	class ImageViewer : AbstractXwtViewContent//, IZoomable
 	{
 		
-		ImageView window ;
-		Xwt.Drawing.Image img;
+		ScrollView window ;
+		ImageView iView;
+		Image 	scaledImg,
+				origImg;
+
+		double zoom = 1.0;
 		
 		public override Xwt.Widget Widget {
 			get {
@@ -47,20 +55,70 @@ namespace MonoDevelop.ImageViewer
 		
 		public ImageViewer ()
 		{			
-			window = new ImageView ();
+			iView = new ImageView ();
+			window = new ScrollView (iView);
 		}
-		
+
 		void SetOptions ()
 		{
 		}
-		
+
 		public override void Load (string fileName)
-		{
-			img = Xwt.Drawing.Image.FromFile (fileName);
-			window.Image = img;
+		{	
+			
+			origImg = Xwt.Drawing.Image.FromFile (fileName);
+			update ();
+			iView.Image = scaledImg;
 			ContentName = fileName;
 			this.IsDirty = false;
 			window.SetFocus ();
 		}
+
+		void update ()
+		{
+			scaledImg = origImg.Scale (zoom, zoom);
+//			this.IsDirty = true;
+//			this.Widget.QueueForReallocate ();
+//			this.RedrawContent ();
+		}
+//		#region IZoomable implementation
+//
+//		public void ZoomIn ()
+//		{
+//			zoom *= 2.0;
+//			update ();
+//		}
+//
+//		public void ZoomOut ()
+//		{
+//			zoom /= 2.0;
+//			update ();
+//		}
+//
+//		public void ZoomReset ()
+//		{
+//			zoom = 1.0;
+//			update ();
+//		}
+//
+//		public bool EnableZoomIn {
+//			get {
+//				return scaledImg == null ? false : true;
+//			}
+//		}
+//
+//		public bool EnableZoomOut {
+//			get {
+//				return scaledImg == null ? false : true;			
+//			}
+//		}
+//
+//		public bool EnableZoomReset {
+//			get {
+//				return scaledImg == null ? false : true;
+//			}
+//		}
+//
+//		#endregion
 	}
 }
