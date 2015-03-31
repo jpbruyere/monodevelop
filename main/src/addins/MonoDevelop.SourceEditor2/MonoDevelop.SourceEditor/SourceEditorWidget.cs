@@ -465,7 +465,7 @@ namespace MonoDevelop.SourceEditor
 			return result;
 		}
 		HashSet<string> symbols = new HashSet<string> ();
-		public bool ReloadSettings;
+		bool reloadSettings;
 		
 		void HandleParseInformationUpdaterWorkerThreadDoWork (bool firstTime, ParsedDocument parsedDocument, CancellationToken token = default(CancellationToken))
 		{
@@ -561,8 +561,10 @@ namespace MonoDevelop.SourceEditor
 				}
 				doc.UpdateFoldSegments (foldSegments, false, true, token);
 
-				if (ReloadSettings & !firstTime) {
-					ReloadSettings = false;
+				if (firstTime)
+					reloadSettings=true;
+				else if (reloadSettings) {
+					reloadSettings = false;
 					Application.Invoke (delegate {
 						if (isDisposed)
 							return;
@@ -570,6 +572,7 @@ namespace MonoDevelop.SourceEditor
 						mainsw.QueueDraw ();
 					});
 				}
+					
 			} catch (Exception ex) {
 				LoggingService.LogError ("Unhandled exception in ParseInformationUpdaterWorkerThread", ex);
 			}
@@ -1148,7 +1151,7 @@ namespace MonoDevelop.SourceEditor
 					return;
 
 				view.StoreSettings ();
-				ReloadSettings = true;
+				reloadSettings = true;
 				view.Load (view.ContentName, view.SourceEncoding, true);
 				view.WorkbenchWindow.ShowNotification = false;
 			} catch (Exception ex) {

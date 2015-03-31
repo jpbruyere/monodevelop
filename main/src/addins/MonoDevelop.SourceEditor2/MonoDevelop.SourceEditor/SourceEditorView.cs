@@ -886,19 +886,18 @@ namespace MonoDevelop.SourceEditor
 			LoadExtensions ();
 			this.IsDirty = !didLoadCleanly;
 			UpdateTasks (null, null);
-			widget.TextEditor.TextArea.SizeAllocated += HandleTextEditorVAdjustmentChanged;
+			//widget.TextEditor.TextArea.SizeAllocated += HandleTextEditorVAdjustmentChanged;
 			if (didLoadCleanly) {
 				Document.InformLoadComplete ();
-				widget.ReloadSettings = true;
 				widget.EnsureCorrectEolMarker (fileName);
 			}
 		}
 		
-		void HandleTextEditorVAdjustmentChanged (object sender, EventArgs e)
-		{
-			widget.TextEditor.TextArea.SizeAllocated -= HandleTextEditorVAdjustmentChanged;
-			LoadSettings ();
-		}
+//		void HandleTextEditorVAdjustmentChanged (object sender, EventArgs e)
+//		{
+//			widget.TextEditor.TextArea.SizeAllocated -= HandleTextEditorVAdjustmentChanged;
+//			LoadSettings ();
+//		}
 
 		internal void LoadSettings ()
 		{
@@ -907,34 +906,41 @@ namespace MonoDevelop.SourceEditor
 				!FileSettingsStore.TryGetValue (ContentName, out settings, TextEditor.Options.EnableFoldPersistence))
 				return;
 
-			if (!widget.TextEditor.Caret.OffsetReloadingNotAllowed) {
-				widget.TextEditor.Caret.SetOffset (settings.CaretOffset, true);
-				widget.TextEditor.VAdjustment.Value = settings.vAdjustment;
-				widget.TextEditor.HAdjustment.Value = settings.hAdjustment;
-			}
+			//save LineY to adapt vAdjustment to new foldings
+			double oldLineY = TextEditor.LineToY (TextEditor.Caret.Line);
 
-
-			foreach (var f in widget.TextEditor.Document.FoldSegments) {
+			foreach (var f in Document.FoldSegments) {
 				bool isFolded;
 				if (settings.FoldingStates.TryGetValue (f.Offset, out isFolded)) {
 					//leave opened where caret has been set
-					f.IsFolded = isFolded & !f.Contains(widget.TextEditor.Caret.Offset);
+					f.IsFolded = isFolded & !f.Contains(CaretOffset);
 				}
+			}
+
+			if (!TextEditor.Caret.OffsetReloadingNotAllowed) {
+				TextEditor.Caret.SetOffset (settings.CaretOffset, true);
+				TextEditor.VAdjustment.Value = settings.vAdjustment;
+				TextEditor.HAdjustment.Value = settings.hAdjustment;
+			} else {
+				//update Adjustments with new foldings states
+				int curLine = Document.OffsetToLineNumber(CaretOffset);
+				double newLineY = TextEditor.LineToY (curLine);
+				TextEditor.VAdjustment.Value -= (oldLineY - newLineY);
 			}
 		}
 		
 		internal void StoreSettings ()
 		{
 			var foldingStates = new Dictionary<int, bool> ();
-			foreach (var f in widget.TextEditor.Document.FoldSegments) {
+			foreach (var f in Document.FoldSegments) {
 				foldingStates [f.Offset] = f.IsFolded;
 			}
 			if (string.IsNullOrEmpty (ContentName))
 				return;
 			FileSettingsStore.Store (ContentName, new FileSettingsStore.Settings () {
-				CaretOffset = widget.TextEditor.Caret.Offset,
-				vAdjustment = widget.TextEditor.VAdjustment.Value,
-				hAdjustment = widget.TextEditor.HAdjustment.Value,
+				CaretOffset = TextEditor.Caret.Offset,
+				vAdjustment = TextEditor.VAdjustment.Value,
+				hAdjustment = TextEditor.HAdjustment.Value,
 				FoldingStates = foldingStates
 			}, TextEditor.Options.EnableFoldPersistence);
 		}

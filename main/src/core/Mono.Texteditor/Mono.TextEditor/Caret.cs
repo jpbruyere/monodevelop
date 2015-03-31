@@ -82,7 +82,6 @@ namespace Mono.TextEditor
 			}
 			set {
 				if (Location != value) {
-					OffsetReloadingNotAllowed = true; //prevent jumping
 					if (value.Line < DocumentLocation.MinLine || value.Column < DocumentLocation.MinColumn)
 						throw new ArgumentException ("invalid location: " + value);
 					DocumentLocation old = Location;
@@ -351,7 +350,7 @@ namespace Mono.TextEditor
 		public event EventHandler ModeChanged;
 
 		public void UpdateCaretOffset ()
-		{
+		{			
 			int result = 0;
 			var doc = TextEditorData.Document;
 			if (doc == null)
@@ -365,6 +364,7 @@ namespace Mono.TextEditor
 			}
 			caretOffset = result;
 			offsetVersion = doc.Version;
+			OffsetReloadingNotAllowed = true; //prevent jumping
 		}
 
 		internal void UpdateCaretPosition (DocumentChangeEventArgs e)

@@ -1240,9 +1240,8 @@ namespace Mono.TextEditor
 			} else {
 				foldedSegments.Remove (args.FoldSegment);
 			}
-			var handler = Folded;
-			if (handler != null)
-				handler (this, args);
+			if (Folded != null)
+				Folded (this, args);
 		}
 		
 		public event EventHandler<FoldSegmentEventArgs> Folded;
