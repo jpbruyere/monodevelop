@@ -25,20 +25,28 @@
 // THE SOFTWARE.
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+using MonoDevelop.Core;
+using MonoDevelop.Core.Serialization;
+
 
 namespace Mono.TextEditor.Utils
 {
 	public static class FileSettingsStore
 	{
-		
+		const long MaxCacheSize = 1048576;//1MB
+
 		public class Settings
 		{
-			public int CaretOffset { get; set; }
-
-			public double vAdjustment { get; set; }
-
-			public double hAdjustment { get; set; }
-
+			[ItemProperty]
+			public int CaretOffset;
+			[ItemProperty]
+			public double vAdjustment;
+			[ItemProperty]
+			public double hAdjustment;
+			[ItemProperty]
 			public Dictionary<int, bool> FoldingStates = new Dictionary<int, bool> ();
 
 			public override string ToString ()
@@ -49,25 +57,97 @@ namespace Mono.TextEditor.Utils
 
 		static Dictionary<string, Settings> settingStore = new Dictionary<string, Settings> ();
 
-		public static bool TryGetValue (string contentName, out Settings settings)
+		static FilePath root {
+			get { return UserProfile.Current.CacheDir.Combine ("FileSettingsStore"); }
+		}
+
+		public static bool TryGetValue (string contentName, out Settings settings, bool persist)
 		{
 			if (contentName == null)
 				throw new ArgumentNullException ("contentName");
-			return settingStore.TryGetValue (contentName, out settings);
+			if (settingStore.TryGetValue (contentName, out settings))
+				return true;
+			if (!persist)
+				return false;
+
+			FilePath path = root + contentName + ".fss";
+
+			if (!File.Exists (path))
+				return false;
+			if (File.GetLastWriteTimeUtc (contentName) > File.GetLastWriteTimeUtc (path)) {
+				Remove (contentName);
+				return false;
+			}
+
+			BinaryDataSerializer serializer = new BinaryDataSerializer (new DataContext ());
+			settings = (Settings)serializer.Deserialize (path, typeof(Settings));
+			return true;
 		}
 
-		public static void Store (string contentName, Settings settings)
+		public static void Store (string contentName, Settings settings, bool persist)
 		{
 			if (contentName == null)
 				throw new ArgumentNullException ("contentName");
 			if (settings == null)
 				throw new ArgumentNullException ("settings");
+
+			if (persist) {
+				FilePath path = root + contentName + ".fss";
+
+				Directory.CreateDirectory (Path.GetDirectoryName (path));
+
+				BinaryDataSerializer serializer = new BinaryDataSerializer (new DataContext ());
+				serializer.Serialize (path, settings);
+			}
 			settingStore [contentName] = settings;
 		}
 
-		public static void Remove (string fileName)
+		public static void Remove (string contentName)
 		{
-			settingStore.Remove (fileName);
+			FilePath path = root + contentName + ".fss";
+			if (!File.Exists (path))
+				return;
+			path.Delete ();
+			DirectoryInfo dir = new DirectoryInfo (Path.GetDirectoryName (path));
+			while(dir.ToString () != root)
+			{
+				if(dir.EnumerateFiles ().Any () || dir.EnumerateDirectories ().Any ())
+					return;
+				dir.Delete ();
+				dir = dir.Parent;
+			}
+			
+			settingStore.Remove (contentName);
+		}
+
+		public static void CacheCleanUp(bool deleteAll = false)
+		{
+			if (deleteAll){
+				Directory.Delete (root, true);
+				return;
+			}
+			if (!Directory.Exists (root))
+				return;
+
+			string[] files = Directory.GetFiles (root, "*.fss", System.IO.SearchOption.AllDirectories);
+			List<FileInfo> list = new List<FileInfo> ();
+			foreach (string s in files)
+				list.Add (new FileInfo (s));
+
+			list = list.OrderBy (l => l.LastAccessTimeUtc).ToList();
+
+			do {
+				long cacheSize = 0;
+				foreach (FileInfo f in list)
+					cacheSize += f.Length;
+				if (MaxCacheSize > cacheSize){
+					FileInfo f = list.FirstOrDefault ();
+					Remove (f.FullName);
+					list.Remove(f);
+				}
+				else
+					break;
+			} while (list.Count > 0);
 		}
 	}
 }

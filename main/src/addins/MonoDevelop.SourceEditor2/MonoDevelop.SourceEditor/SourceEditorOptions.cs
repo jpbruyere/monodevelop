@@ -151,6 +151,11 @@ namespace MonoDevelop.SourceEditor
 				case "ShowFoldMargin":
 					base.ShowFoldMargin = (bool)args.NewValue;
 					break;
+				case "EnableFoldPersistence":
+					base.EnableFoldPersistence = (bool)args.NewValue;
+					if (!base.EnableFoldPersistence)
+						Mono.TextEditor.Utils.FileSettingsStore.CacheCleanUp(true);
+					break;
 				case "HighlightCaretLine":
 					base.HighlightCaretLine = (bool)args.NewValue;
 					break;
@@ -174,6 +179,9 @@ namespace MonoDevelop.SourceEditor
 					break;
 				case "DefaultCommentFolding":
 					this.DefaultCommentFolding = (bool)args.NewValue;
+					break;
+				case "DefaultImportsFolding":
+					this.DefaultImportsFolding = (bool)args.NewValue;
 					break;
 				case "UseViModes":
 					this.UseViModes = (bool)args.NewValue;
@@ -212,6 +220,7 @@ namespace MonoDevelop.SourceEditor
 			this.indentStyle = PropertyService.Get ("IndentStyle", IndentStyle.Smart);
 			base.ShowLineNumberMargin = PropertyService.Get ("ShowLineNumberMargin", true);
 			base.ShowFoldMargin = PropertyService.Get ("ShowFoldMargin", false);
+			base.EnableFoldPersistence = PropertyService.Get ("EnableFoldPersistence", false);
 			base.HighlightCaretLine = PropertyService.Get ("HighlightCaretLine", false);
 			base.HighlightMatchingBracket = PropertyService.Get ("HighlightMatchingBracket", true);
 			base.ShowRuler = PropertyService.Get ("ShowRuler", false);
@@ -220,6 +229,7 @@ namespace MonoDevelop.SourceEditor
 			base.ColorScheme = PropertyService.Get ("ColorScheme", "Default");
 			this.defaultRegionsFolding = PropertyService.Get ("DefaultRegionsFolding", false);
 			this.defaultCommentFolding = PropertyService.Get ("DefaultCommentFolding", true);
+			this.defaultImportsFolding = PropertyService.Get ("DefaultImportsFolding", true);
 			this.useViModes = PropertyService.Get ("UseViModes", false);
 			this.onTheFlyFormatting = PropertyService.Get ("OnTheFlyFormatting", true);
 
@@ -274,7 +284,28 @@ namespace MonoDevelop.SourceEditor
 				}
 			}
 		}
-		
+
+		bool defaultImportsFolding;
+		public bool DefaultImportsFolding {
+			get {
+				return defaultImportsFolding;
+			}
+			set {
+				if (value != this.defaultImportsFolding) {
+					this.defaultImportsFolding = value;
+					PropertyService.Set ("DefaultImportsFolding", value);
+					OnChanged (EventArgs.Empty);
+				}
+			}
+		}
+
+		public override bool EnableFoldPersistence {
+			set {
+				PropertyService.Set ("EnableFoldPersistence", value);
+				base.EnableFoldPersistence = value;
+			}
+		}
+
 		public bool EnableSemanticHighlighting {
 			get {
 				return true;

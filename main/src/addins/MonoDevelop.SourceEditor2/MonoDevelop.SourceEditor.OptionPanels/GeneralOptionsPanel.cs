@@ -45,6 +45,8 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 		public virtual Gtk.Widget CreatePanelWidget ()
 		{
 			this.foldingCheckbutton.Active = DefaultSourceEditorOptions.Instance.ShowFoldMargin;
+			this.foldPersistenceCheckbutton.Active = DefaultSourceEditorOptions.Instance.EnableFoldPersistence;
+			this.foldImportsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultImportsFolding;
 			this.foldregionsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultRegionsFolding;
 			this.foldCommentsCheckbutton.Active = DefaultSourceEditorOptions.Instance.DefaultCommentFolding;
 			//			wordWrapCheckbutton.Active = DefaultSourceEditorOptions.Instance.WrapLines;
@@ -63,6 +65,8 @@ namespace MonoDevelop.SourceEditor.OptionPanels
 				DefaultSourceEditorOptions.Instance.ShowFoldMargin = this.foldingCheckbutton.Active;
 				HighlightingPanel.UpdateActiveDocument ();
 			}
+			DefaultSourceEditorOptions.Instance.EnableFoldPersistence = this.foldPersistenceCheckbutton.Active;
+			DefaultSourceEditorOptions.Instance.DefaultImportsFolding = this.foldImportsCheckbutton.Active;
 //			DefaultSourceEditorOptions.Instance.WrapLines = wordWrapCheckbutton.Active;
 		}
 

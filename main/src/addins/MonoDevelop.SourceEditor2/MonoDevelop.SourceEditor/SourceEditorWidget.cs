@@ -529,6 +529,16 @@ namespace MonoDevelop.SourceEditor
 						setFolded = options.DefaultCommentFolding;
 						folded = false;
 						break;
+//TODO: Region and comments are parsed in CSharpFoldingParser,
+//on the RunFirstTimeFoldUpdate, but it does not implement 'using' statement parsing.
+//The default behaviour of comments and region depend on this parser, so
+//maybe this parser should be remove. All this lead to DefaultImports folding
+//not to work
+					case FoldType.Using:
+						type = FoldingType.Comment;
+						setFolded = options.DefaultImportsFolding;
+						folded = true;
+						break;
 					case FoldType.Undefined:
 						setFolded = true;
 						folded = region.IsFoldedByDefault;
@@ -551,7 +561,9 @@ namespace MonoDevelop.SourceEditor
 				}
 				doc.UpdateFoldSegments (foldSegments, false, true, token);
 
-				if (reloadSettings) {
+				if (firstTime)
+					reloadSettings=true;
+				else if (reloadSettings) {
 					reloadSettings = false;
 					Application.Invoke (delegate {
 						if (isDisposed)
@@ -560,6 +572,7 @@ namespace MonoDevelop.SourceEditor
 						mainsw.QueueDraw ();
 					});
 				}
+					
 			} catch (Exception ex) {
 				LoggingService.LogError ("Unhandled exception in ParseInformationUpdaterWorkerThread", ex);
 			}

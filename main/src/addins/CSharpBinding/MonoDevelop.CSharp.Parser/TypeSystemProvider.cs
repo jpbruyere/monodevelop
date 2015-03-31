@@ -134,12 +134,15 @@ namespace MonoDevelop.CSharp.Parser
 					if (next is UsingDeclaration || next is UsingAliasDeclaration) {
 						node = next;
 					} else {
-						break;
+						while (next is NewLineNode || next is ICSharpCode.NRefactory.CSharp.Comment)
+							next = next.GetNextNode ();
+						if (!(next is UsingDeclaration || next is UsingAliasDeclaration))
+							break;
+						node = next;
 					}
 				}
-				if (firstChild != node) {
-					Foldings.Add (new FoldingRegion (new DomRegion (firstChild.StartLocation, node.EndLocation), FoldType.Undefined));
-				}
+				if (firstChild != node)
+					Foldings.Add (new FoldingRegion ("using...", new DomRegion (firstChild.StartLocation, node.EndLocation), FoldType.Using));
 			}
 			public override object VisitSyntaxTree (SyntaxTree unit, object data)
 			{

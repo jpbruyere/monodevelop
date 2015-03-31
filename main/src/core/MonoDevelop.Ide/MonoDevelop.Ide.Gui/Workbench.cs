@@ -107,6 +107,14 @@ namespace MonoDevelop.Ide.Gui
 					CheckFileStatus ();
 				};
 
+				FileService.FileRemoved +=  FileEditCacheClean;
+				FileService.FileRenamed += FileEditCacheClean;
+				FileService.FileMoved += FileEditCacheClean;
+
+				IdeApp.Exited += delegate(object o, EventArgs args) {
+					Mono.TextEditor.Utils.FileSettingsStore.CacheCleanUp();
+				};
+
 				pads = null;	// Make sure we get an up to date pad list.
 				monitor.Step (1);
 			} finally {
@@ -1124,7 +1132,19 @@ namespace MonoDevelop.Ide.Gui
 		{
 			workbench.UnlockActiveWindowChangeEvent ();
 		}
-
+		internal void FileEditCacheClean (object sender, FileEventArgs e)
+		{
+			foreach (FileEventInfo fei in e)
+				Mono.TextEditor.Utils.FileSettingsStore.Remove (fei.FileName);
+		}
+		internal void FileEditCacheClean(object sender, FileCopyEventArgs e)
+		{
+			foreach (FileCopyEventInfo f in e) {
+				if (!f.IsDirectory) {
+					Mono.TextEditor.Utils.FileSettingsStore.Remove (f.SourceFile);
+				}
+			}
+		}
 		List<FileData> fileStatus;
 		object fileStatusLock = new object ();
 		// http://msdn.microsoft.com/en-us/library/system.io.file.getlastwritetimeutc(v=vs.110).aspx
@@ -1397,7 +1417,7 @@ namespace MonoDevelop.Ide.Gui
 			
 			IEditableTextBuffer ipos = (IEditableTextBuffer) newContent.GetContent (typeof(IEditableTextBuffer));
 			if (fileInfo.Line > 0 && ipos != null) {
-				Mono.TextEditor.Utils.FileSettingsStore.Remove (fileName);
+				//Mono.TextEditor.Utils.FileSettingsStore.Remove (fileName);
 				ipos.RunWhenLoaded (JumpToLine); 
 			}
 			

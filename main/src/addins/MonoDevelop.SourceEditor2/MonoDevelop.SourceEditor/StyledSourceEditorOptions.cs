@@ -225,6 +225,11 @@ namespace MonoDevelop.SourceEditor
 			set { throw new NotSupportedException (); }
 		}
 
+		public bool EnableFoldPersistence {
+			get { return DefaultSourceEditorOptions.Instance.EnableFoldPersistence; }
+			set { throw new NotSupportedException (); }
+		}
+
 		public bool ShowIconMargin {
 			get { return DefaultSourceEditorOptions.Instance.ShowIconMargin; }
 			set { throw new NotSupportedException (); }
@@ -315,6 +320,10 @@ namespace MonoDevelop.SourceEditor
 
 		public bool DefaultRegionsFolding {
 			get { return DefaultSourceEditorOptions.Instance.DefaultRegionsFolding; }
+		}
+
+		public bool DefaultImportsFolding {
+			get { return DefaultSourceEditorOptions.Instance.DefaultImportsFolding; }
 		}
 
 		public EditorFontType EditorFontType {

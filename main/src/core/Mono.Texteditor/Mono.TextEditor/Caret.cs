@@ -98,6 +98,12 @@ namespace Mono.TextEditor
 
 		ITextSourceVersion offsetVersion;
 		int caretOffset;
+		/// <summary>
+		/// If no task has already modified the offset,
+		/// FileSettingsStore or normal file loading may
+		/// init the offset
+		/// </summary>
+		public bool OffsetReloadingNotAllowed = false;
 		public int Offset {
 			get {
 				return caretOffset;
@@ -105,18 +111,27 @@ namespace Mono.TextEditor
 			set {
 				if (caretOffset == value)
 					return;
-				DocumentLocation old = Location;
-				caretOffset = value;
-				offsetVersion = TextEditorData.Document.Version;
-				line = System.Math.Max (1, TextEditorData.Document.OffsetToLineNumber (value));
-				var lineSegment = TextEditorData.Document.GetLine (line);
-				column = lineSegment != null ? value - lineSegment.Offset + 1 : 1;
-				
-				CheckLine ();
-				CheckColumn ();
-				SetDesiredColumn ();
-				OnPositionChanged (new DocumentLocationEventArgs (old));
+				OffsetReloadingNotAllowed = true;
+				SetOffset (value);
 			}
+		}
+		// initialOffset=true => offset comes from init or persistence.</param>
+		public void SetOffset(int newOffset, bool initialOffset = false)
+		{
+			if (initialOffset & OffsetReloadingNotAllowed)
+				return;
+			DocumentLocation old = Location;
+			caretOffset = newOffset;
+			offsetVersion = TextEditorData.Document.Version;
+			line = System.Math.Max (1, TextEditorData.Document.OffsetToLineNumber (newOffset));
+			var lineSegment = TextEditorData.Document.GetLine (line);
+			column = lineSegment != null ? newOffset - lineSegment.Offset + 1 : 1;
+
+			CheckLine ();
+			CheckColumn ();
+			SetDesiredColumn ();
+			OnPositionChanged (new DocumentLocationEventArgs (old));
+
 		}
 
 		public bool PreserveSelection {
@@ -335,7 +350,7 @@ namespace Mono.TextEditor
 		public event EventHandler ModeChanged;
 
 		public void UpdateCaretOffset ()
-		{
+		{			
 			int result = 0;
 			var doc = TextEditorData.Document;
 			if (doc == null)
@@ -349,6 +364,7 @@ namespace Mono.TextEditor
 			}
 			caretOffset = result;
 			offsetVersion = doc.Version;
+			OffsetReloadingNotAllowed = true; //prevent jumping
 		}
 
 		internal void UpdateCaretPosition (DocumentChangeEventArgs e)
