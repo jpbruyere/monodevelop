@@ -370,11 +370,11 @@ namespace MonoDevelop.Components
 				OnDrawContent (evnt, context); // Draw content first so we can easily clip it
 				retVal = base.OnExposeEvent (evnt);
 
-				changed = Theme.SetBorderPath (context, BorderAllocation, position);
-				context.Operator = Cairo.Operator.DestIn;
-				context.SetSourceRGBA (1, 1, 1, 1);
-				context.Fill ();
-				context.Operator = Cairo.Operator.Over;
+//				changed = Theme.SetBorderPath (context, BorderAllocation, position);
+//				context.Operator = Cairo.Operator.DestIn;
+//				context.SetSourceRGBA (1, 1, 1, 1);
+//				context.Fill ();
+//				context.Operator = Cairo.Operator.Over;
 
 				// protect against overriden methods which leave in a bad state
 				context.Save ();
