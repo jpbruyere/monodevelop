@@ -31,8 +31,9 @@ using System.Collections.Generic;
 using MonoDevelop.Core;
 using NuGet;
 using MonoDevelop.PackageManagement;
+using MonoDevelop.Projects;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public class PackageManagementEvents : IPackageManagementEvents
 	{
@@ -188,6 +189,33 @@ namespace ICSharpCode.PackageManagement
 		{
 			if (PackageRestored != null) {
 				PackageRestored (this, new PackageRestoredEventArgs (package));
+			}
+		}
+
+		public event EventHandler<DotNetProjectReferenceEventArgs> ReferenceRemoving;
+
+		public void OnReferenceRemoving (ProjectReference reference)
+		{
+			if (ReferenceRemoving != null) {
+				ReferenceRemoving (this, new DotNetProjectReferenceEventArgs (reference));
+			}
+		}
+
+		public event EventHandler<DotNetProjectReferenceEventArgs> ReferenceAdding;
+
+		public void OnReferenceAdding (ProjectReference reference)
+		{
+			if (ReferenceAdding != null) {
+				ReferenceAdding (this, new DotNetProjectReferenceEventArgs (reference));
+			}
+		}
+
+		public event EventHandler<DotNetProjectImportEventArgs> ImportRemoved;
+
+		public void OnImportRemoved (IDotNetProject project, string import)
+		{
+			if (ImportRemoved != null) {
+				ImportRemoved (this, new DotNetProjectImportEventArgs (project, import));
 			}
 		}
 	}

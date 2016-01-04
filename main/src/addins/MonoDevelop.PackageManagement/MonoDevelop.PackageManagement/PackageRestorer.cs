@@ -26,7 +26,7 @@
 
 using System;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Projects;
 using System.Collections.Generic;
 using MonoDevelop.Core;
@@ -77,7 +77,7 @@ namespace MonoDevelop.PackageManagement
 					RestoreWithProgressMonitor (progressMessage);
 				}
 			} catch (Exception ex) {
-				LoggingService.LogInternalError (ex);
+				LoggingService.LogError ("Package restore failed", ex);
 				RestoreFailed = true;
 			}
 		}

@@ -135,7 +135,8 @@ namespace MonoDevelop.VersionControl.Views
 
 			buttonCommit = new Gtk.Button () {
 				Image = new Xwt.ImageView (Xwt.Drawing.Image.FromResource ("commit-16.png")).ToGtkWidget (),
-				Label = GettextCatalog.GetString ("Commit...")
+				Label = GettextCatalog.GetString ("Commit..."),
+				Name = "buttonCommit"
 			};
 			buttonCommit.Image.Show ();
 			buttonRevert = new Gtk.Button () {
@@ -457,7 +458,7 @@ namespace MonoDevelop.VersionControl.Views
 
 			ThreadPool.QueueUserWorkItem (delegate {
 				if (fileList != null) {
-					var group = fileList.GroupBy (v => v.IsDirectory || v.WorkspaceObject is SolutionItem);
+					var group = fileList.GroupBy (v => v.IsDirectory || v.WorkspaceObject is SolutionFolderItem);
 					foreach (var item in group) {
 						// Is directory.
 						if (item.Key) {
@@ -471,7 +472,7 @@ namespace MonoDevelop.VersionControl.Views
 				}
 				List<VersionInfo> newList = new List<VersionInfo> ();
 				newList.AddRange (vc.GetDirectoryVersionInfo (filepath, remoteStatus, true));
-				DispatchService.GuiDispatch (delegate {
+				Runtime.RunInMainThread (delegate {
 					if (!disposed)
 						LoadStatus (newList);
 				});
@@ -815,7 +816,7 @@ namespace MonoDevelop.VersionControl.Views
 			string[] files = GetCurrentFiles ();
 			VersionControlItemList items = new VersionControlItemList ();
 			foreach (string file in files) {
-				Project prj = IdeApp.Workspace.GetProjectContainingFile (file);
+				Project prj = IdeApp.Workspace.GetProjectsContainingFile (file).FirstOrDefault ();
 				items.Add (new VersionControlItem (vc, prj, file, Directory.Exists (file), null));
 			}
 			return items;
@@ -1125,6 +1126,13 @@ namespace MonoDevelop.VersionControl.Views
 		[CommandHandler (MonoDevelop.Ide.Commands.EditCommands.Copy)]
 		protected void OnCopy ()
 		{
+			Gtk.Clipboard clipboard;
+			if (commitText.HasFocus) {
+				clipboard = Gtk.Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
+				commitText.Buffer.CopyClipboard (clipboard);
+				return;
+			}
+
 			StringBuilder sb = new StringBuilder ();
 			TreeIter iter;
 			foreach (var p in filelist.Selection.GetSelectedRows ()) {
@@ -1136,7 +1144,7 @@ namespace MonoDevelop.VersionControl.Views
 					sb.AppendLine (line);
 			}
 
-			var clipboard = Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
+			clipboard = Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
 			clipboard.Text = sb.ToString ();
 			clipboard = Clipboard.Get (Gdk.Atom.Intern ("PRIMARY", false));
 			clipboard.Text = sb.ToString ();

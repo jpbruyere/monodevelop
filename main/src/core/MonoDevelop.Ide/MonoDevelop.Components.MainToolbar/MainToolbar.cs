@@ -30,7 +30,6 @@ using MonoDevelop.Ide;
 using MonoDevelop.Ide.Commands;
 using MonoDevelop.Core;
 using System.Linq;
-using MonoDevelop.Core.Assemblies;
 using MonoDevelop.Components;
 using Cairo;
 using MonoDevelop.Projects;
@@ -38,14 +37,11 @@ using System.Collections.Generic;
 using Mono.Addins;
 using MonoDevelop.Components.Commands.ExtensionNodes;
 using MonoDevelop.Ide.Gui;
-using MonoDevelop.Ide.Execution;
 using MonoDevelop.Core.Execution;
 using MonoDevelop.Ide.TypeSystem;
 using System.Threading;
-using ICSharpCode.NRefactory.TypeSystem;
-using Mono.TextEditor;
+using MonoDevelop.Ide.Editor;
 using System.Text;
-
 
 namespace MonoDevelop.Components.MainToolbar
 {
@@ -110,16 +106,22 @@ namespace MonoDevelop.Components.MainToolbar
 				return;
 			}
 
-			renderer.Visible = runtime.Visible;
-			renderer.Sensitive = runtime.Enabled;
-			renderer.Xpad = (uint)(runtime.IsIndented ? 18 : 3);
+			using (var mutableModel = runtime.GetMutableModel ()) {
+				renderer.Visible = mutableModel.Visible;
+				renderer.Sensitive = mutableModel.Enabled;
+				renderer.Xpad = (uint)(runtime.IsIndented ? 18 : 3);
 
-			if (!runtimeCombo.PopupShown) {
-				renderer.Text = runtime.FullDisplayString;
-				renderer.Attributes = normalAttributes;
-			} else {
-				renderer.Text = runtime.DisplayString;
-				renderer.Attributes = runtime.Notable ? boldAttributes : normalAttributes;
+				if (!runtimeCombo.PopupShown) {
+					// no need to ident text when the combo dropdown is not showing
+					if (Platform.IsWindows)
+						renderer.Xpad = 3;
+					renderer.Text = mutableModel.FullDisplayString;
+					renderer.Attributes = normalAttributes;
+				} else {
+					renderer.Text = mutableModel.DisplayString;
+					renderer.Attributes = runtime.Notable ? boldAttributes : normalAttributes;
+				}
+
 			}
 		}
 
@@ -274,7 +276,8 @@ namespace MonoDevelop.Components.MainToolbar
 		void SetDefaultSizes (int comboHeight, int height)
 		{
 			configurationCombo.SetSizeRequest (150, comboHeight);
-			runtimeCombo.SetSizeRequest (150, comboHeight);
+			// make the windows runtime slightly wider to accomodate select devices text
+			runtimeCombo.SetSizeRequest (Platform.IsWindows ? 175 : 150, comboHeight);
 			statusArea.SetSizeRequest (32, 32);
 			matchEntry.HeightRequest = height + 4;
 			buttonBar.HeightRequest = height + 2;
@@ -290,8 +293,7 @@ namespace MonoDevelop.Components.MainToolbar
 
 		void HandleSearchEntryChanged (object sender, EventArgs e)
 		{
-			if (SearchEntryActivated != null)
-				SearchEntryChanged (sender, e);
+			SearchEntryChanged?.Invoke (sender, e);
 		}
 
 		void HandleSearchEntryActivated (object sender, EventArgs e)

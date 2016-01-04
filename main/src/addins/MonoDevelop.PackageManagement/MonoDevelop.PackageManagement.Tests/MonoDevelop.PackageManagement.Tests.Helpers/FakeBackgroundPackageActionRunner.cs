@@ -26,7 +26,7 @@
 
 using System;
 using System.Collections.Generic;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
@@ -77,6 +77,8 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 				throw new NotImplementedException ();
 			}
 		}
+
+		public bool IsRunning { get; set; }
 	}
 }
 

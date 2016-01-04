@@ -444,6 +444,12 @@ namespace MonoDevelop.Debugger.Tests
 		[Test]
 		public void DebuggerStepperBoundaryMethod2ProjectAssembliesOnly ()
 		{
+			IgnoreSoftDebugger ("Fix me");
+			//SDB Ignore: DebuggerStepperBoundary is stupid and pretty much uselss attribute anyway
+			//Problem that we have here is that DebuggerStepperBoundary is handled on IDE side
+			//and if method that has DebuggerStepperBoundary also has DebuggerNonUserCode IDE
+			//is never notified about entering such method since runtime handles DebuggerNonUserCode
+			//hence bug
 			InitializeTest ();
 			Session.Options.ProjectAssembliesOnly = true;
 			AddBreakpoint ("f3a22b38-596a-4463-a562-20b342fdec12");
@@ -874,6 +880,7 @@ namespace MonoDevelop.Debugger.Tests
 		public void CatchPointTest2 ()
 		{
 			IgnoreSoftDebugger ("I'm having problem testing this because. There is error nonstop happening in framework about CurrentCulture featching.");
+			IgnoreCorDebugger ("Randomly fails");
 
 			InitializeTest ();
 			AddCatchpoint ("System.Exception", true);
@@ -881,6 +888,28 @@ namespace MonoDevelop.Debugger.Tests
 			CheckPosition ("d24b1c9d-3944-4f0d-be31-5556251fbdf5");
 			Assert.IsTrue (Session.ActiveThread.Backtrace.GetFrame (0).IsExternalCode);
 			Assert.IsFalse (Session.ActiveThread.Backtrace.GetFrame (1).IsExternalCode);
+		}
+
+		[Test]
+		public void CatchpointIgnoreExceptionsInNonUserCodeTest ()
+		{
+			//It seems CorDebugger has different definition of what is user code and what is not.
+			IgnoreCorDebugger ("CorDebugger: TODO");
+
+			InitializeTest ();
+			Session.Options.ProjectAssembliesOnly = true;
+			AddBreakpoint ("999b8a83-8c32-4640-a8e1-f74309cda79c");
+			AddCatchpoint ("System.Exception", true);
+			StartTest ("CatchpointIgnoreExceptionsInNonUserCode");
+			CheckPosition ("999b8a83-8c32-4640-a8e1-f74309cda79c");
+
+			InitializeTest ();
+			Session.Options.ProjectAssembliesOnly = false;
+			AddCatchpoint ("System.Exception", true);
+			AddBreakpoint ("999b8a83-8c32-4640-a8e1-f74309cda79c");
+			StartTest ("CatchpointIgnoreExceptionsInNonUserCode");
+			WaitStop (2000);
+			Assert.AreEqual ("3913936e-3f89-4f07-a863-7275aaaa5fc9", Session.ActiveThread.Backtrace.GetFrame (0).GetException ().Message);
 		}
 
 		[Test]

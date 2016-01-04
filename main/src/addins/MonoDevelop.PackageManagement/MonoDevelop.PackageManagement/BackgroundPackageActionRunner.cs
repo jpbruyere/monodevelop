@@ -27,7 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using MonoDevelop.Projects;
@@ -44,6 +44,7 @@ namespace MonoDevelop.PackageManagement
 		IPackageManagementEvents packageManagementEvents;
 		IProgressProvider progressProvider;
 		List<InstallPackageAction> pendingInstallActions = new List<InstallPackageAction> ();
+		int runCount;
 
 		public BackgroundPackageActionRunner (
 			IPackageManagementProgressMonitorFactory progressMonitorFactory,
@@ -53,6 +54,10 @@ namespace MonoDevelop.PackageManagement
 			this.progressMonitorFactory = progressMonitorFactory;
 			this.packageManagementEvents = packageManagementEvents;
 			this.progressProvider = progressProvider;
+		}
+
+		public bool IsRunning {
+			get { return runCount > 0; }
 		}
 
 		public IEnumerable<InstallPackageAction> PendingInstallActions {
@@ -73,7 +78,8 @@ namespace MonoDevelop.PackageManagement
 		{
 			AddInstallActionsToPendingQueue (actions);
 			packageManagementEvents.OnPackageOperationsStarting ();
-			BackgroundDispatch (() => RunActionsWithProgressMonitor (progressMessage, actions.ToList ()));
+			runCount++;
+			BackgroundDispatch (() => TryRunActionsWithProgressMonitor (progressMessage, actions.ToList ()));
 		}
 
 		void AddInstallActionsToPendingQueue (IEnumerable<IPackageAction> actions)
@@ -83,16 +89,20 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		public void RunAndWait (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions)
+		void TryRunActionsWithProgressMonitor (ProgressMonitorStatusMessage progressMessage, IList<IPackageAction> actions)
 		{
-			AddInstallActionsToPendingQueue (actions);
-			packageManagementEvents.OnPackageOperationsStarting ();
-			DispatchService.BackgroundDispatchAndWait (() => RunActionsWithProgressMonitor (progressMessage, actions.ToList ()));
+			try {
+				RunActionsWithProgressMonitor (progressMessage, actions);
+			} catch (Exception ex) {
+				LoggingService.LogInternalError (ex);
+			} finally {
+				GuiDispatch (() => runCount--);
+			}
 		}
 
 		void RunActionsWithProgressMonitor (ProgressMonitorStatusMessage progressMessage, IList<IPackageAction> installPackageActions)
 		{
-			using (IProgressMonitor monitor = progressMonitorFactory.CreateProgressMonitor (progressMessage.Status)) {
+			using (ProgressMonitor monitor = progressMonitorFactory.CreateProgressMonitor (progressMessage.Status)) {
 				using (PackageManagementEventsMonitor eventMonitor = CreateEventMonitor (monitor)) {
 					try {
 						monitor.BeginTask (null, installPackageActions.Count);
@@ -112,20 +122,20 @@ namespace MonoDevelop.PackageManagement
 			}
 		}
 
-		PackageManagementEventsMonitor CreateEventMonitor (IProgressMonitor monitor)
+		PackageManagementEventsMonitor CreateEventMonitor (ProgressMonitor monitor)
 		{
 			return CreateEventMonitor (monitor, packageManagementEvents, progressProvider);
 		}
 
 		protected virtual PackageManagementEventsMonitor CreateEventMonitor (
-			IProgressMonitor monitor,
+			ProgressMonitor monitor,
 			IPackageManagementEvents packageManagementEvents,
 			IProgressProvider progressProvider)
 		{
 			return new PackageManagementEventsMonitor (monitor, packageManagementEvents, progressProvider);
 		}
 
-		void RunActionsWithProgressMonitor (IProgressMonitor monitor, IList<IPackageAction> packageActions)
+		void RunActionsWithProgressMonitor (ProgressMonitor monitor, IList<IPackageAction> packageActions)
 		{
 			foreach (IPackageAction action in packageActions) {
 				action.Execute ();
@@ -192,27 +202,27 @@ namespace MonoDevelop.PackageManagement
 
 		public void ShowError (ProgressMonitorStatusMessage progressMessage, Exception exception)
 		{
-			LoggingService.LogInternalError (progressMessage.Status, exception);
+			LoggingService.LogError (progressMessage.Error, exception);
 			ShowError (progressMessage, exception.Message);
 		}
 
 		public void ShowError (ProgressMonitorStatusMessage progressMessage, string error)
 		{
-			using (IProgressMonitor monitor = progressMonitorFactory.CreateProgressMonitor (progressMessage.Status)) {
+			using (ProgressMonitor monitor = progressMonitorFactory.CreateProgressMonitor (progressMessage.Status)) {
 				monitor.Log.WriteLine (error);
 				monitor.ReportError (progressMessage.Error, null);
 				monitor.ShowPackageConsole ();
 			}
 		}
 
-		protected virtual void BackgroundDispatch (MessageHandler handler)
+		protected virtual void BackgroundDispatch (Action action)
 		{
-			DispatchService.BackgroundDispatch (handler);
+			PackageManagementBackgroundDispatcher.Dispatch (action);
 		}
 
-		protected virtual void GuiDispatch (MessageHandler handler)
+		protected virtual void GuiDispatch (Action handler)
 		{
-			DispatchService.GuiDispatch (handler);
+			Runtime.RunInMainThread (handler);
 		}
 	}
 }

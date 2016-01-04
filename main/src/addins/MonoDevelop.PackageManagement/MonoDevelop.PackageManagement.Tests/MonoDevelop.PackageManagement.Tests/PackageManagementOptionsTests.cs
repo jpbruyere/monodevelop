@@ -29,7 +29,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Xml;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.PackageManagement.Tests.Helpers;
 using NuGet;
@@ -179,16 +179,16 @@ namespace MonoDevelop.PackageManagement.Tests
 			registeredPackageSources.Clear ();
 			registeredPackageSources.Add (packageSource);
 
-			var expectedSavedPackageSourceSettings = new List<KeyValuePair<string, string>> ();
-			expectedSavedPackageSourceSettings.Add (new KeyValuePair<string, string> ("Test", "http://codeplex.com"));
+			var expectedSavedPackageSourceSettings = new List<SettingValue> ();
+			expectedSavedPackageSourceSettings.Add (new SettingValue ("Test", "http://codeplex.com", false));
 
-			IList<KeyValuePair<string, string>> actualSavedPackageSourceSettings = fakeSettings.GetValuesPassedToSetValuesForPackageSourcesSection ();
+			IList<SettingValue> actualSavedPackageSourceSettings = fakeSettings.GetValuesPassedToSetValuesForPackageSourcesSection ();
 
 			Assert.AreEqual (expectedSavedPackageSourceSettings, actualSavedPackageSourceSettings);
 		}
 
 		[Test]
-		public void PackageSources_OnePackageSourceAdded_PackageSourcesSectionDeletedFromSettings ()
+		public void PackageSources_OnePackageSourceAdded_PackageSourcesSectionUpdated ()
 		{
 			CreateSettings ();
 			CreateOptions (fakeSettings);
@@ -198,9 +198,11 @@ namespace MonoDevelop.PackageManagement.Tests
 			registeredPackageSources.Clear ();
 			registeredPackageSources.Add (packageSource);
 
-			bool sectionDeleted = fakeSettings.IsPackageSourcesSectionDeleted;
+			IList<SettingValue> settings = fakeSettings.SectionsUpdated [RegisteredPackageSourceSettings.PackageSourcesSectionName];
 
-			Assert.IsTrue (sectionDeleted);
+			Assert.AreEqual (1, settings.Count);
+			Assert.AreEqual ("Test", settings[0].Key);
+			Assert.AreEqual ("http://codeplex.com", settings[0].Value);
 		}
 
 		[Test]
@@ -226,14 +228,14 @@ namespace MonoDevelop.PackageManagement.Tests
 		public void ActivePackageSource_SourceChanged_ActivePackageSourceUpdatedInSettings ()
 		{
 			CreateOptions ();
-			var packageSource = new PackageSource ("http://sharpdevelop.com", "Test");
+			var packageSource = new PackageSource ("http://monodevelop.com", "Test");
 
 			options.ActivePackageSource = packageSource;
 
-			var expectedKeyValuePair = new KeyValuePair<string, string> ("Test", "http://sharpdevelop.com");
-			KeyValuePair<string, string> actualKeyValuePair = fakeSettings.GetValuePassedToSetValueForActivePackageSourceSection ();
+			var expectedSetting = new SettingValue ("Test", "http://monodevelop.com", false);
+			SettingValue actualSetting = fakeSettings.GetValuePassedToSetValueForActivePackageSourceSection ();
 
-			Assert.AreEqual (expectedKeyValuePair, actualKeyValuePair);
+			Assert.AreEqual (expectedSetting, actualSetting);
 		}
 
 		[Test]
@@ -283,7 +285,7 @@ namespace MonoDevelop.PackageManagement.Tests
 		{
 			CreateOptions ();
 
-			options.ActivePackageSource = new PackageSource ("http://sharpdevelop.com", "Test");
+			options.ActivePackageSource = new PackageSource ("http://monodevelop.com", "Test");
 
 			bool sectionDeleted = fakeSettings.IsActivePackageSourceSectionDeleted;
 
@@ -395,9 +397,9 @@ namespace MonoDevelop.PackageManagement.Tests
 			registeredPackageSources.Clear ();
 			registeredPackageSources.Add (packageSource);
 
-			bool sectionDeleted = fakeSettings.IsDisabledPackageSourcesSectionDeleted;
+			IList<SettingValue> settings = fakeSettings.SectionsUpdated[RegisteredPackageSourceSettings.DisabledPackageSourceSectionName];
 
-			Assert.IsTrue (sectionDeleted);
+			Assert.AreEqual (0, settings.Count);
 		}
 
 		[Test]
@@ -411,10 +413,10 @@ namespace MonoDevelop.PackageManagement.Tests
 			registeredPackageSources.Clear ();
 			registeredPackageSources.Add (packageSource);
 
-			var expectedSavedPackageSourceSettings = new List<KeyValuePair<string, string>> ();
-			expectedSavedPackageSourceSettings.Add (new KeyValuePair<string, string> (packageSource.Name, "true"));
+			var expectedSavedPackageSourceSettings = new List<SettingValue> ();
+			expectedSavedPackageSourceSettings.Add (new SettingValue (packageSource.Name, "true", false));
 
-			IList<KeyValuePair<string, string>> actualSavedPackageSourceSettings = 
+			IList<SettingValue> actualSavedPackageSourceSettings = 
 				fakeSettings.GetValuesPassedToSetValuesForDisabledPackageSourcesSection ();
 			Assert.AreEqual (expectedSavedPackageSourceSettings, actualSavedPackageSourceSettings);
 		}
@@ -430,7 +432,7 @@ namespace MonoDevelop.PackageManagement.Tests
 			registeredPackageSources.Clear ();
 			registeredPackageSources.Add (packageSource);
 
-			IList<KeyValuePair<string, string>> actualSavedPackageSourceSettings = 
+			IList<SettingValue> actualSavedPackageSourceSettings = 
 				fakeSettings.GetValuesPassedToSetValuesForDisabledPackageSourcesSection ();
 			Assert.AreEqual (0, actualSavedPackageSourceSettings.Count);
 		}
@@ -464,10 +466,10 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			options.IsPackageRestoreEnabled = true;
 
-			KeyValuePair<string, string> keyPair = fakeSettings.GetValuePassedToSetValueForPackageRestoreSection ();
+			SettingValue setting = fakeSettings.GetValuePassedToSetValueForPackageRestoreSection ();
 
-			Assert.AreEqual ("enabled", keyPair.Key);
-			Assert.AreEqual ("True", keyPair.Value);
+			Assert.AreEqual ("enabled", setting.Key);
+			Assert.AreEqual ("True", setting.Value);
 		}
 
 		[Test]
@@ -492,8 +494,8 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			options.IsPackageRestoreEnabled = false;
 
-			KeyValuePair<string, string> keyValuePair = fakeSettings.GetValuePassedToSetValueForPackageRestoreSection ();
-			Assert.AreEqual ("False", keyValuePair.Value);
+			SettingValue setting = fakeSettings.GetValuePassedToSetValueForPackageRestoreSection ();
+			Assert.AreEqual ("False", setting.Value);
 		}
 
 		[Test]

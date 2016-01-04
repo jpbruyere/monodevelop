@@ -29,7 +29,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using NuGet;
 
@@ -93,6 +93,7 @@ namespace MonoDevelop.PackageManagement
 			} catch (WebException ex) {
 				return CreatePackageSourceViewModelCheckedEventArgs (packageSource, ex);
 			} catch (Exception ex) {
+				LogPackageSourceException (packageSource, ex);
 				return new PackageSourceViewModelCheckedEventArgs (packageSource, ex.Message);
 			}
 		}
@@ -159,7 +160,7 @@ namespace MonoDevelop.PackageManagement
 				}
 			}
 
-			LoggingService.LogInfo (String.Format ("Package source '{0}' returned exception.", packageSource.SourceUrl), ex);
+			LogPackageSourceException (packageSource, ex);
 
 			switch (ex.Status) {
 			case WebExceptionStatus.ConnectFailure:
@@ -172,6 +173,11 @@ namespace MonoDevelop.PackageManagement
 			}
 
 			return new PackageSourceViewModelCheckedEventArgs (packageSource, errorMessage);
+		}
+
+		void LogPackageSourceException (PackageSourceViewModel packageSource, Exception ex)
+		{
+			LoggingService.LogInfo (String.Format ("Package source '{0}' returned exception.", packageSource.SourceUrl), ex);
 		}
 
 		void OnPackageSourceChecked (object sender, ITask<PackageSourceViewModelCheckedEventArgs> task)

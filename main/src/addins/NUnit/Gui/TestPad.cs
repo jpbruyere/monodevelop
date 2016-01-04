@@ -41,11 +41,11 @@ using MonoDevelop.Ide.Execution;
 using MonoDevelop.Components.Docking;
 using MonoDevelop.Ide;
 using MonoDevelop.Projects;
-using Mono.TextEditor;
 using System.Linq;
 using MonoDevelop.Components;
 using MonoDevelop.Ide.Commands;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.NUnit
 {
@@ -53,7 +53,7 @@ namespace MonoDevelop.NUnit
 	{
 		NUnitService testService = NUnitService.Instance;
 		
-		IAsyncOperation runningTestOperation;
+		AsyncOperation runningTestOperation;
 		VPaned paned;
 		TreeView detailsTree;
 		ListStore detailsStore;
@@ -76,7 +76,6 @@ namespace MonoDevelop.NUnit
 		int TestResultPage;
 		int TestOutputPage;
 		
-		EventHandler testChangedHandler;
 		VBox detailsPad;
 		
 		ArrayList testNavigationHistory = new ArrayList ();
@@ -87,8 +86,7 @@ namespace MonoDevelop.NUnit
 		{
 			base.Initialize (builders, options, menuPath);
 			
-			testChangedHandler = (EventHandler) DispatchService.GuiDispatch (new EventHandler (OnDetailsTestChanged));
-			testService.TestSuiteChanged += (EventHandler) DispatchService.GuiDispatch (new EventHandler (OnTestSuiteChanged));
+			testService.TestSuiteChanged += OnTestSuiteChanged;
 			paned = new VPaned ();
 			
 			VBox vbox = new VBox ();
@@ -415,11 +413,14 @@ namespace MonoDevelop.NUnit
 		{
 			UnitTest test = GetSelectedTest ();
 			if (test != null) {
-				SolutionEntityItem item = test.OwnerObject as SolutionEntityItem;
+				SolutionItem item = test.OwnerObject as SolutionItem;
 				ExecutionModeCommandService.GenerateExecutionModeCommands (
 				    item,
 				    test.CanRun,
 				    info);
+
+				foreach (var ci in info)
+					ci.Enabled = runningTestOperation == null;
 			}
 		}
 		
@@ -443,9 +444,12 @@ namespace MonoDevelop.NUnit
 				return;
 
 			foreach (var mode in debugModeSet.ExecutionModes) {
-				if (test.CanRun (mode.ExecutionHandler))
-					info.Add (GettextCatalog.GetString ("Debug Test ({0})", mode.Name), mode.Id);
+				if (test.CanRun (mode.ExecutionHandler)) {
+					var ci = info.Add (GettextCatalog.GetString ("Debug Test ({0})", mode.Name), mode.Id);
+					ci.Enabled = runningTestOperation == null;
+				}
 			}
+
 			if (info.Count == 1)
 				info [0].Text = GettextCatalog.GetString ("Debug Test");
 		}
@@ -471,12 +475,12 @@ namespace MonoDevelop.NUnit
 			return nav.DataItem as UnitTest;
 		}
 
-		public IAsyncOperation RunTest (UnitTest test, IExecutionHandler mode)
+		public AsyncOperation RunTest (UnitTest test, IExecutionHandler mode)
 		{
 			return RunTest (FindTestNode (test), mode, false);
 		}
 
-		IAsyncOperation RunTest (ITreeNavigator nav, IExecutionHandler mode, bool bringToFront = true)
+		AsyncOperation RunTest (ITreeNavigator nav, IExecutionHandler mode, bool bringToFront = true)
 		{
 			if (nav == null)
 				return null;
@@ -491,7 +495,7 @@ namespace MonoDevelop.NUnit
 			if (bringToFront)
 				IdeApp.Workbench.GetPad<TestPad> ().BringToFront ();
 			runningTestOperation = testService.RunTest (test, mode);
-			runningTestOperation.Completed += (OperationHandler) DispatchService.GuiDispatch (new OperationHandler (OnTestSessionCompleted));
+			runningTestOperation.Task.ContinueWith (t => OnTestSessionCompleted (), TaskScheduler.FromCurrentSynchronizationContext ());
 			return runningTestOperation;
 		}
 		
@@ -505,10 +509,9 @@ namespace MonoDevelop.NUnit
 			RunTest (TreeView.GetSelectedNode (), mode);
 		}
 		
-		void OnTestSessionCompleted (IAsyncOperation op)
+		void OnTestSessionCompleted ()
 		{
-			if (op.Success)
-				RefreshDetails ();
+			RefreshDetails ();
 			runningTestOperation = null;
 			this.buttonRunAll.Sensitive = true;
 			this.buttonStop.Sensitive = false;
@@ -564,7 +567,7 @@ namespace MonoDevelop.NUnit
 			detailLabel.Markup = "";
 			detailsStore.Clear ();
 			if (detailsTest != null)
-				detailsTest.TestChanged -= testChangedHandler;
+				detailsTest.TestChanged -= OnDetailsTestChanged;
 			detailsTest = null;
 			detailsDate = DateTime.MinValue;
 			detailsReferenceDate = DateTime.MinValue;
@@ -585,7 +588,7 @@ namespace MonoDevelop.NUnit
 			detailsPad.Sensitive = true;
 			
 			if (detailsTest != null)
-				detailsTest.TestChanged -= testChangedHandler;
+				detailsTest.TestChanged -= OnDetailsTestChanged;
 			
 			if (detailsTest != test) {
 				detailsTest = test;
@@ -595,7 +598,7 @@ namespace MonoDevelop.NUnit
 				if (testNavigationHistory.Count > 50)
 					testNavigationHistory.RemoveAt (0);
 			}
-			detailsTest.TestChanged += testChangedHandler;
+			detailsTest.TestChanged += OnDetailsTestChanged;
 			
 			if (test is UnitTestGroup) {
 				infoBook.HidePage (TestResultPage);

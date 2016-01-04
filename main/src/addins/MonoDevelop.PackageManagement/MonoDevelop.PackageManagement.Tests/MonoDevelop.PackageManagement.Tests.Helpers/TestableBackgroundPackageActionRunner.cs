@@ -25,7 +25,8 @@
 // THE SOFTWARE.
 
 using System;
-using ICSharpCode.PackageManagement;
+using System.Collections.Generic;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using NuGet;
@@ -34,7 +35,7 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
 	public class TestableBackgroundPackageActionRunner : BackgroundPackageActionRunner
 	{
-		MessageHandler backgroundDispatcher;
+		public List<Action> BackgroundActionsQueued = new List<Action> ();
 
 		public TestableBackgroundPackageActionRunner (
 			IPackageManagementProgressMonitorFactory progressMonitorFactory,
@@ -42,30 +43,52 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 			IProgressProvider progressProvider)
 			: base (progressMonitorFactory, packageManagementEvents, progressProvider)
 		{
+			Init ();
+		}
+
+		void Init ()
+		{
+			CreateEventMonitorAction = (monitor, packageManagementEvents, progressProvider) => {
+				EventsMonitor = new TestablePackageManagementEventsMonitor (monitor, packageManagementEvents, progressProvider);
+				return EventsMonitor;
+			};
+		}
+
+		public void ExecuteSingleBackgroundDispatch ()
+		{
+			BackgroundActionsQueued [0].Invoke ();
+			BackgroundActionsQueued.RemoveAt (0);
 		}
 
 		public void ExecuteBackgroundDispatch ()
 		{
-			backgroundDispatcher.Invoke ();
+			foreach (Action action in BackgroundActionsQueued) {
+				action ();
+			}
+			BackgroundActionsQueued.Clear ();
 		}
 
-		protected override void BackgroundDispatch (MessageHandler handler)
+		protected override void BackgroundDispatch (Action action)
 		{
-			backgroundDispatcher = handler;
+			BackgroundActionsQueued.Add (action);
 		}
 
-		protected override void GuiDispatch (MessageHandler handler)
+		protected override void GuiDispatch (Action action)
 		{
-			handler.Invoke ();
+			action ();
 		}
+
+		public Func<ProgressMonitor,
+			IPackageManagementEvents,
+			IProgressProvider,
+			PackageManagementEventsMonitor> CreateEventMonitorAction;
 
 		protected override PackageManagementEventsMonitor CreateEventMonitor (
-			IProgressMonitor monitor,
+			ProgressMonitor monitor,
 			IPackageManagementEvents packageManagementEvents,
 			IProgressProvider progressProvider)
 		{
-			EventsMonitor = new TestablePackageManagementEventsMonitor (monitor, packageManagementEvents, progressProvider);
-			return EventsMonitor;
+			return CreateEventMonitorAction (monitor, packageManagementEvents, progressProvider);
 		}
 
 		public TestablePackageManagementEventsMonitor EventsMonitor;

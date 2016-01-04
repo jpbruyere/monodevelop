@@ -61,7 +61,7 @@ namespace MonoDevelop.Ide.Execution
 			return null;
 		}
 		
-		public static void GenerateExecutionModeCommands (SolutionEntityItem project, CanExecuteDelegate runCheckDelegate, CommandArrayInfo info)
+		public static void GenerateExecutionModeCommands (SolutionItem project, CanExecuteDelegate runCheckDelegate, CommandArrayInfo info)
 		{
 			CommandExecutionContext ctx = new CommandExecutionContext (project, runCheckDelegate);
 			bool supportsParameterization = false;
@@ -90,7 +90,8 @@ namespace MonoDevelop.Ide.Execution
 			}
 
 			var targets = new List<ExecutionTarget> ();
-			FlattenExecutionTargets (targets, project.GetExecutionTargets (IdeApp.Workspace.ActiveConfiguration));
+			if (project != null)
+				FlattenExecutionTargets (targets, project.GetExecutionTargets (IdeApp.Workspace.ActiveConfiguration));
 
 			if (targets.Count > 1) {
 				foreach (var t in targets) {
@@ -123,8 +124,8 @@ namespace MonoDevelop.Ide.Execution
 		{
 			CommandItem item = (CommandItem) data;
 			if (item.Mode == null) {
-				var dlg = new CustomExecutionModeManagerDialog (item.Context);
-				MessageService.ShowCustomDialog (dlg);
+				using (var dlg = new CustomExecutionModeManagerDialog (item.Context))
+					MessageService.ShowCustomDialog (dlg);
 				return null;
 			}
 			
@@ -241,9 +242,8 @@ namespace MonoDevelop.Ide.Execution
 		
 		internal static CustomExecutionMode ShowParamtersDialog (CommandExecutionContext ctx, IExecutionMode mode, CustomExecutionMode currentMode)
 		{
-			CustomExecutionMode cmode = null;
-			
-			DispatchService.GuiSyncDispatch (delegate {
+			return Runtime.RunInMainThread (delegate {
+				CustomExecutionMode cmode = null;
 				CustomExecutionModeDialog dlg = new CustomExecutionModeDialog ();
 				try {
 					dlg.Initialize (ctx, mode, currentMode);
@@ -253,11 +253,12 @@ namespace MonoDevelop.Ide.Execution
 						if (dlg.Save)
 							SaveCustomCommand (ctx.Project, cmode);
 					}
+					return cmode;
 				} finally {
 					dlg.Destroy ();
+					dlg.Dispose ();
 				}
-			});
-			return cmode;
+			}).Result;
 		}
 		
 		internal class CommandItem
@@ -287,7 +288,7 @@ namespace MonoDevelop.Ide.Execution
 			}
 		}
 		
-		internal static void SaveCustomCommand (SolutionEntityItem project, CustomExecutionMode cmode)
+		internal static void SaveCustomCommand (SolutionItem project, CustomExecutionMode cmode)
 		{
 			CustomExecutionModes modes = GetCustomExecutionModeList (project, cmode.Scope);
 			bool found = false;
@@ -311,7 +312,7 @@ namespace MonoDevelop.Ide.Execution
 				IdeApp.Workspace.SavePreferences ();
 		}
 		
-		static CustomExecutionModes GetCustomExecutionModeList (SolutionEntityItem project, CustomModeScope scope)
+		static CustomExecutionModes GetCustomExecutionModeList (SolutionItem project, CustomModeScope scope)
 		{
 			CustomExecutionModes modes;
 			if (scope == CustomModeScope.Global) {
@@ -334,7 +335,7 @@ namespace MonoDevelop.Ide.Execution
 			return modes;
 		}
 		
-		internal static void RemoveCustomCommand (SolutionEntityItem project, CustomExecutionMode cmode)
+		internal static void RemoveCustomCommand (SolutionItem project, CustomExecutionMode cmode)
 		{
 			CustomExecutionModes modes = GetCustomExecutionModeList (project, cmode.Scope);
 			modes.Data.Remove (cmode);
@@ -462,7 +463,7 @@ namespace MonoDevelop.Ide.Execution
 			return Mode.ExecutionHandler.CanExecute (command);
 		}
 		
-		public IProcessAsyncOperation Execute (ExecutionCommand command, IConsole console)
+		public ProcessAsyncOperation Execute (ExecutionCommand command, OperationConsole console)
 		{
 			if (Mode is CustomExecutionMode)
 				return ((CustomExecutionMode)Mode).Execute (command, console, true, true);
@@ -487,7 +488,7 @@ namespace MonoDevelop.Ide.Execution
 			return Handler.CanExecute (command);
 		}
 		
-		public IProcessAsyncOperation Execute (ExecutionCommand command, IConsole console)
+		public ProcessAsyncOperation Execute (ExecutionCommand command, OperationConsole console)
 		{
 			return Handler.InternalExecute (Context, ParentMode, command, console);
 		}

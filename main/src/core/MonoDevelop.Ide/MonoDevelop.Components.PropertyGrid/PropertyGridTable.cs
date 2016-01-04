@@ -30,7 +30,6 @@ using System.ComponentModel;
 using System.Collections.Generic;
 using Cairo;
 using System.Linq;
-using Mono.TextEditor;
 using MonoDevelop.Core;
 
 namespace MonoDevelop.Components.PropertyGrid
@@ -609,7 +608,7 @@ namespace MonoDevelop.Components.PropertyGrid
 
 			if (row != null && editSession == null) {
 				var bounds = GetInactiveEditorBounds (row);
-				if (!bounds.IsEmpty && bounds.Contains ((int)evnt.X, (int)evnt.Y) && row.Enabled) {
+				if (!bounds.IsEmpty && bounds.Contains ((int)evnt.X, (int)evnt.Y)) {
 					StartEditing (row);
 					return true;
 				}
@@ -698,8 +697,7 @@ namespace MonoDevelop.Components.PropertyGrid
 		void ShowTooltipWindow (int x, int y)
 		{
 			tooltipTimeout = 0;
-			int dx = (int)((double)Allocation.Width * dividerPosition);
-			if (x >= dx)
+			if (x >= Allocation.Width)
 				return;
 			var row = GetAllRows (true).FirstOrDefault (r => !r.IsCategory && y >= r.EditorBounds.Y && y <= r.EditorBounds.Bottom);
 			if (row != null) {

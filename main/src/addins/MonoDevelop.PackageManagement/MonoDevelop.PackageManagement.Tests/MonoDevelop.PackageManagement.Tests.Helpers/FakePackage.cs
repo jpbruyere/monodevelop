@@ -28,7 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Versioning;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using NuGet;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
@@ -231,6 +231,15 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		public bool DevelopmentDependency { get; set; }
 
 		public bool IsValid { get; set; }
+
+		public IFileSystem FileSystemPassedToExtractContents;
+		public string ExtractPathPassedToExtractContents;
+
+		public void ExtractContents (IFileSystem fileSystem, string extractPath)
+		{
+			FileSystemPassedToExtractContents = fileSystem;
+			ExtractPathPassedToExtractContents = extractPath;
+		}
 	}
 }
 

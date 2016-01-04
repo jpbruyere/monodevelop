@@ -27,17 +27,22 @@ using System;
 using AppKit;
 using Foundation;
 using Gtk;
+using MonoDevelop.Core;
 using MonoDevelop.Components.Mac;
+using MonoDevelop.Ide;
+using Xwt.Mac;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
 	[Register]
 	class SearchBar : NSSearchField
 	{
+		bool debugSearchbar;
 		internal Widget gtkWidget;
 		internal event EventHandler<Xwt.KeyEventArgs> KeyPressed;
 		internal event EventHandler LostFocus;
-		new internal event EventHandler Activated;
+		internal event EventHandler SelectionActivated;
+		public event EventHandler GainedFocus;
 
 		/// <summary>
 		/// This tells whether events have been attached when created from the menu.
@@ -48,6 +53,8 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 		{
 			Cell.Scrollable = true;
 			Initialize ();
+			var debugFilePath = System.IO.Path.Combine (Environment.GetFolderPath (Environment.SpecialFolder.Personal), ".xs-searchbar-debug");
+			debugSearchbar = System.IO.File.Exists (debugFilePath);
 		}
 
 		public SearchBar (IntPtr ptr) : base (ptr)
@@ -55,110 +62,110 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 			Initialize ();
 		}
 
+		internal void LogMessage (string message)
+		{
+			if (!debugSearchbar)
+				return;
+
+			LoggingService.LogInfo (message);
+		}
+
 		void Initialize ()
 		{
-			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResignKeyNotification, notification => {
-				if (notification.Object == Window)
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResignKeyNotification, notification => Runtime.RunInMainThread (() => {
+				var other = (NSWindow)notification.Object;
+
+				LogMessage ($"Lost focus from resign key: {other.DebugDescription}.");
+				if (notification.Object == Window) {
 					if (LostFocus != null)
 						LostFocus (this, null);
-			});
-			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notification => {
-				if (notification.Object == Window)
+				}
+			}));
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notification => Runtime.RunInMainThread (() => {
+				var other = (NSWindow)notification.Object;
+				LogMessage ($"Lost focus from resize: {other.DebugDescription}.");
+				if (notification.Object == Window) {
 					if (LostFocus != null)
 						LostFocus (this, null);
-			});
+				}
+			}));
 		}
 
-		static Xwt.ModifierKeys TranslateMask (NSEventModifierMask mask)
+		bool SendKeyPressed (Xwt.KeyEventArgs kargs)
 		{
-			Xwt.ModifierKeys xwtMask = Xwt.ModifierKeys.None;
-			if (mask.HasFlag (NSEventModifierMask.CommandKeyMask))
-				xwtMask |= Xwt.ModifierKeys.Command;
-			if (mask.HasFlag (NSEventModifierMask.ControlKeyMask))
-				xwtMask |= Xwt.ModifierKeys.Control;
-			if (mask.HasFlag (NSEventModifierMask.ShiftKeyMask))
-				xwtMask |= Xwt.ModifierKeys.Shift;
-			if (mask.HasFlag (NSEventModifierMask.AlternateKeyMask))
-				xwtMask |= Xwt.ModifierKeys.Alt;
-			return xwtMask;
-		}
-
-		static Xwt.Key TranslateKey (NSKey key)
-		{
-			switch (key)
-			{
-			case NSKey.UpArrow:
-				return Xwt.Key.Up;
-			case NSKey.DownArrow:
-				return Xwt.Key.Down;
-			case NSKey.LeftArrow:
-				return Xwt.Key.Left;
-			case NSKey.RightArrow:
-				return Xwt.Key.Right;
-			case NSKey.Home:
-				return Xwt.Key.Home;
-			case NSKey.End:
-				return Xwt.Key.End;
-			case NSKey.PageUp:
-				return Xwt.Key.PageUp;
-			case NSKey.PageDown:
-				return Xwt.Key.PageDown;
-			}
-			return 0;
-		}
-
-		bool SendKeyPressed (Xwt.Key key, Xwt.ModifierKeys mask)
-		{
-			var kargs = new Xwt.KeyEventArgs (key, mask, false, 0);
 			if (KeyPressed != null)
 				KeyPressed (this, kargs);
 
+			LogMessage ($"KeyPressed with Handled {kargs.Handled}");
 			return kargs.Handled;
 		}
 
 		public override bool PerformKeyEquivalent (NSEvent theEvent)
 		{
-			if (theEvent.KeyCode == (ushort)NSKey.Escape) {
-				SendKeyPressed (Xwt.Key.Escape, Xwt.ModifierKeys.None);
-				base.PerformKeyEquivalent (theEvent);
+			var popupHandled = SendKeyPressed (theEvent.ToXwtKeyEventArgs ());
+			LogMessage ($"Popup handled {popupHandled}");
+			if (popupHandled)
 				return true;
-			}
-
-			// Use CharactersIgnoringModifiers instead of KeyCode. They don't match Xwt anyway.
-			if (SendKeyPressed (TranslateKey ((NSKey)theEvent.CharactersIgnoringModifiers[0]), TranslateMask (theEvent.ModifierFlags)))
-				return true;
-
-			return base.PerformKeyEquivalent (theEvent);
+			var baseHandled = base.PerformKeyEquivalent (theEvent);;
+			LogMessage ($"Base handled {baseHandled}");
+			return baseHandled;
 		}
 
 		public override void DidEndEditing (NSNotification notification)
 		{
 			base.DidEndEditing (notification);
 
+			LogMessage ("Did end editing");
+
 			nint value = ((NSNumber)notification.UserInfo.ValueForKey ((NSString)"NSTextMovement")).LongValue;
 			if (value == (nint)(long)NSTextMovement.Tab) {
+				LogMessage ("Tab movement");
 				SelectText (this);
 				return;
 			}
 
 			if (value == (nint)(long)NSTextMovement.Return) {
-				if (Activated != null)
-					Activated (this, null);
+				LogMessage ("Activated by enter");
+				if (SelectionActivated != null)
+					SelectionActivated (this, null);
 				return;
 			}
 
+			LogMessage ($"Got NSTextMovement: {value}");
+
 			// This means we've reached a focus loss event.
 			var replacedWith = notification.UserInfo.ValueForKey ((NSString)"_NSFirstResponderReplacingFieldEditor");
-			if (replacedWith != this && LostFocus != null)
+			if (replacedWith != this && LostFocus != null) {
+				if (replacedWith != null)
+					LogMessage ($"Mouse focus loss to {replacedWith.DebugDescription}");
 				LostFocus (this, null);
+			}
 		}
 
 		public override void ViewDidMoveToWindow ()
 		{
 			base.ViewDidMoveToWindow ();
 
+			LogMessage ("View moved to parent window");
 			// Needs to be grabbed after it's parented.
 			gtkWidget = GtkMacInterop.NSViewToGtkWidget (this);
+		}
+
+		public override bool BecomeFirstResponder ()
+		{
+			LogMessage ("Becoming first responder");
+			bool firstResponder = base.BecomeFirstResponder ();
+			if (firstResponder)
+				Focus ();
+
+			return firstResponder;
+		}
+
+		public void Focus ()
+		{
+			LogMessage ("Focused");
+			if (GainedFocus != null)
+				GainedFocus (this, EventArgs.Empty);
 		}
 	}
 }

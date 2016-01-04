@@ -4,6 +4,8 @@ See http://www.monodevelop.com for more info.
 
 [![Build Status](http://jenkins.mono-project.com/job/test-monodevelop-mainline/badge/icon)](http://jenkins.mono-project.com/job/test-monodevelop-mainline/)
 
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/mono/monodevelop?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Directory organization
 ----------------------
 
@@ -68,16 +70,14 @@ Packaging for OS X
 
 To package MonoDevelop for OS X in a convenient MonoDevelop.app
 file, just do this after MonoDevelop has finished building (with
-`make`): `cd main/build/MacOSX ; make`.
+`make`): `cd main/build/MacOSX ; make app`.
 You can run MonoDevelop: `open MonoDevelop.app` or build dmg package: `./make-dmg-bundle.sh`
 
 Dependencies
 ------------
 
-	Mono >= 3.0.4
-	Gtk# >= 2.12.8
-	monodoc >= 1.0
-	mono-addins >= 0.6
+- [Windows](https://github.com/mono/md-website/blob/gh-pages/developers/building-monodevelop.md#prerequisites-and-source)
+- [Unix](http://www.monodevelop.com/developers/building-monodevelop/#linux)
 
 Special Environment Variables
 -----------------------------
@@ -110,7 +110,7 @@ http://www.monodevelop.com
 
 **Gnome Human Interface Guidelines (HIG)**
 
-http://developer.gnome.org/projects/gup/hig/1.0/
+https://developer.gnome.org/hig/stable/
 
 **freedesktop.org standards**
 

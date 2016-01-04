@@ -3,9 +3,6 @@
 	<Extension path = "/MonoDevelop/Ide/Commands">
 	</Extension>	
 
-	<Extension path = "/MonoDevelop/ProjectModel/SerializableClasses">
-	</Extension>
-
 	<Extension path = "/MonoDevelop/Deployment/DeployDirectoryResolvers">
 	</Extension>
 
@@ -13,11 +10,6 @@
 		<Class id="Deployment.Linux" insertbefore="PrepareDeploy" class = "MonoDevelop.Deployment.Linux.LinuxDeployExtension" />
 	</Extension>
 	
-	<Extension path = "/MonoDevelop/ProjectModel/ExtendedProperties">
-<!--		<ItemProperty class = "MonoDevelop.Projects.ProjectFile"
-			name = "DeployService.TargetDirectoryId" type = "System.String" />
--->	</Extension>
-
 	<Extension path = "/MonoDevelop/Ide/Pads/ProjectPad">
 <!--		<NodeBuilder class = "MonoDevelop.Deployment.NodeBuilders.PackagingProjectNodeBuilder"/>
 		<NodeBuilder class = "MonoDevelop.Deployment.NodeBuilders.PackageNodeBuilder"/>
@@ -49,21 +41,10 @@
 		</Condition>
 	</Extension>
 
-	<Extension path = "/MonoDevelop/ProjectModel/ExtendedProperties">
-		<ItemProperty class = "MonoDevelop.Projects.SolutionItem"
-			name = "Deployment.LinuxDeployData" type = "MonoDevelop.Deployment.Linux.LinuxDeployData" />
-	</Extension>
-
 	<Extension path = "/MonoDevelop/Deployment/DeployDirectories">
 		<Condition id="Platform" value="linux">
 			<DeployDirectory id="Linux.PkgConfig" _label="pkg-config folder" />
 			<DeployDirectory id="Linux.DesktopApplications" _label=".desktop application folder" />
-		</Condition>
-	</Extension>
-	
-	<Extension path = "/MonoDevelop/Ide/ProjectFeatures">
-		<Condition id="Platform" value="linux">
-			<Class class = "MonoDevelop.Deployment.Linux.LinuxIntegrationProjectFeature" />
 		</Condition>
 	</Extension>
 

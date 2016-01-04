@@ -32,15 +32,16 @@ using MonoDevelop.Ide;
 using MonoDevelop.PackageManagement;
 using NuGet;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public class LicenseAcceptanceService : ILicenseAcceptanceService
 	{
 		public bool AcceptLicenses(IEnumerable<IPackage> packages)
 		{
-			LicenseAcceptanceDialog dialog = CreateLicenseAcceptanceDialog(packages);
-			int result = MessageService.ShowCustomDialog(dialog);
-			return result == (int)Gtk.ResponseType.Ok;
+			using (LicenseAcceptanceDialog dialog = CreateLicenseAcceptanceDialog (packages)) {
+				int result = MessageService.ShowCustomDialog (dialog);
+				return result == (int)Gtk.ResponseType.Ok;
+			}
 		}
 		
 		LicenseAcceptanceDialog CreateLicenseAcceptanceDialog(IEnumerable<IPackage> packages)

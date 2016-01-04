@@ -27,7 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using NuGet;
@@ -37,7 +37,7 @@ namespace MonoDevelop.PackageManagement
 {
 	public class PackageManagementEventsMonitor : IDisposable
 	{
-		IProgressMonitor progressMonitor;
+		ProgressMonitor progressMonitor;
 		IPackageManagementEvents packageManagementEvents;
 		IProgressProvider progressProvider;
 		FileConflictResolution lastFileConflictResolution;
@@ -45,9 +45,10 @@ namespace MonoDevelop.PackageManagement
 		string currentProgressOperation;
 		List<FileEventArgs> fileChangedEvents = new List<FileEventArgs> ();
 		List<IPackageManagementProject> projectsRequiringTypeSystemRefresh = new List<IPackageManagementProject> ();
+		ISolution solutionContainingProjectBuildersToDispose;
 
 		public PackageManagementEventsMonitor (
-			IProgressMonitor progressMonitor,
+			ProgressMonitor progressMonitor,
 			IPackageManagementEvents packageManagementEvents,
 			IProgressProvider progressProvider)
 		{
@@ -60,12 +61,14 @@ namespace MonoDevelop.PackageManagement
 			packageManagementEvents.AcceptLicenses += AcceptLicenses;
 			packageManagementEvents.FileChanged += FileChanged;
 			packageManagementEvents.ParentPackageInstalled += PackageInstalled;
+			packageManagementEvents.ImportRemoved += ImportRemoved;
 			progressProvider.ProgressAvailable += ProgressAvailable;
 		}
 
 		public void Dispose ()
 		{
 			progressProvider.ProgressAvailable -= ProgressAvailable;
+			packageManagementEvents.ImportRemoved -= ImportRemoved;
 			packageManagementEvents.ParentPackageInstalled -= PackageInstalled;
 			packageManagementEvents.FileChanged -= FileChanged;
 			packageManagementEvents.AcceptLicenses -= AcceptLicenses;
@@ -73,6 +76,7 @@ namespace MonoDevelop.PackageManagement
 			packageManagementEvents.PackageOperationMessageLogged -= PackageOperationMessageLogged;
 
 			NotifyFilesChanged ();
+			UnloadMSBuildHost ();
 			RefreshTypeSystem ();
 		}
 
@@ -97,7 +101,7 @@ namespace MonoDevelop.PackageManagement
 
 		protected virtual void GuiSyncDispatch (MessageHandler handler)
 		{
-			DispatchService.GuiSyncDispatch (handler);
+			Runtime.RunInMainThread (() => handler ()).Wait ();
 		}
 
 		void PackageOperationMessageLogged (object sender, PackageOperationMessageLoggedEventArgs e)
@@ -188,14 +192,14 @@ namespace MonoDevelop.PackageManagement
 
 		public void ReportError (ProgressMonitorStatusMessage progressMessage, Exception ex)
 		{
-			LoggingService.LogInternalError (ex);
+			LoggingService.LogError (progressMessage.Error, ex);
 			progressMonitor.Log.WriteLine (ex.Message);
 			progressMonitor.ReportError (progressMessage.Error, null);
 			ShowPackageConsole (progressMonitor);
 			packageManagementEvents.OnPackageOperationError (ex);
 		}
 
-		protected virtual void ShowPackageConsole (IProgressMonitor progressMonitor)
+		protected virtual void ShowPackageConsole (ProgressMonitor progressMonitor)
 		{
 			progressMonitor.ShowPackageConsole ();
 		}
@@ -209,10 +213,11 @@ namespace MonoDevelop.PackageManagement
 
 		protected virtual void ReconnectAssemblyReferences (IPackageManagementProject project)
 		{
-			var projectWrapper = TypeSystemService.GetProjectContentWrapper (project.DotNetProject);
-			if (projectWrapper != null) {
-				projectWrapper.ReconnectAssemblyReferences ();
-			}
+			// TODO : Roslyn port ? 
+//			var projectWrapper = TypeSystemService.GetProjectContentWrapper (project.DotNetProject);
+//			if (projectWrapper != null) {
+//				projectWrapper.ReconnectAssemblyReferences ();
+//			}
 		}
 
 		void PackageInstalled (object sender, ParentPackageOperationEventArgs e)
@@ -231,6 +236,23 @@ namespace MonoDevelop.PackageManagement
 		{
 			return (operation.Action == PackageAction.Install) &&
 				operation.Package.GetBuildFiles ().Any ();
+		}
+
+		void ImportRemoved (object sender, DotNetProjectImportEventArgs e)
+		{
+			solutionContainingProjectBuildersToDispose = e.Project.ParentSolution;
+		}
+
+		void UnloadMSBuildHost ()
+		{
+			if (solutionContainingProjectBuildersToDispose == null)
+				return;
+
+			GuiSyncDispatch (() => {
+				foreach (IDotNetProject project in solutionContainingProjectBuildersToDispose.GetAllProjects ()) {
+					project.DisposeProjectBuilder ();
+				}
+			});
 		}
 	}
 }

@@ -28,7 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
@@ -57,6 +57,22 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 
 		public void OnFileChanged (string path)
 		{
+		}
+
+		public string FileNamePassedToOpenFile;
+		public bool IsOpenFileCalled;
+
+		public void OpenFile (string path)
+		{
+			IsOpenFileCalled = true;
+			FileNamePassedToOpenFile = path;
+		}
+
+		public List<string> ExistingFileNames = new List<string> ();
+
+		public bool FileExists (string path)
+		{
+			return ExistingFileNames.Contains (path);
 		}
 	}
 }

@@ -97,14 +97,13 @@ namespace MonoDevelop.WebReferences.WCF
 		protected override string GenerateDescriptionFiles (DotNetProject dotNetProject, FilePath basePath)
 		{
 			if (!dotNetProject.Items.GetAll<WCFMetadata> ().Any ()) {
-				var met = new WCFMetadata ();
-				met.Path = basePath.ParentDirectory;
+				var met = new WCFMetadata (basePath.ParentDirectory);
 				dotNetProject.Items.Add (met);
 			}
 			
 			WCFMetadataStorage metStor = dotNetProject.Items.GetAll<WCFMetadataStorage> ().FirstOrDefault (m => m.Path.CanonicalPath == basePath);
 			if (metStor == null)
-				dotNetProject.Items.Add (new WCFMetadataStorage { Path = basePath });
+				dotNetProject.Items.Add (new WCFMetadataStorage (basePath));
 			
 			string file = Path.Combine (basePath, "Reference.svcmap");
 			if (protocol != null) {
@@ -243,8 +242,9 @@ namespace MonoDevelop.WebReferences.WCF
 		
 		ReferenceGroup ConvertMapFile (string mapFile)
 		{
-			var prot = new DiscoveryClientProtocol ();
-			DiscoveryClientResultCollection files = prot.ReadAll (mapFile);
+			DiscoveryClientResultCollection files;
+			using (var prot = new DiscoveryClientProtocol ())
+				files = prot.ReadAll (mapFile);
 			
 			var map = new ReferenceGroup ();
 			

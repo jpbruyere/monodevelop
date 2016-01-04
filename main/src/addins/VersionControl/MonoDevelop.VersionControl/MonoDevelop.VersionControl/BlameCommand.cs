@@ -39,6 +39,7 @@ namespace MonoDevelop.VersionControl
 		static bool CanShow (VersionControlItem item)
 		{
 			return !item.IsDirectory
+				// FIXME: Review appending of Annotate support and use it.
 				&& item.VersionInfo.IsVersioned
 				&& AddinManager.GetExtensionObjects<IBlameViewHandler> (BlameViewHandlers).Any (h => h.CanHandle (item, null));
 		}
@@ -49,7 +50,7 @@ namespace MonoDevelop.VersionControl
 				return items.All (CanShow);
 			
 			foreach (var item in items) {
-				var document = IdeApp.Workbench.OpenDocument (item.Path, OpenDocumentOptions.Default | OpenDocumentOptions.OnlyInternalViewer);
+				var document = IdeApp.Workbench.OpenDocument (item.Path, item.ContainerProject, OpenDocumentOptions.Default | OpenDocumentOptions.OnlyInternalViewer);
 				if (document != null)
 					document.Window.SwitchView (document.Window.FindView<IBlameView> ());
 			}

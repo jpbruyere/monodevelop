@@ -31,15 +31,16 @@ using System.Collections.Generic;
 using MonoDevelop.Ide;
 using MonoDevelop.PackageManagement;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public class SelectProjectsService : ISelectProjectsService
 	{
 		public bool SelectProjects(IEnumerable<IPackageManagementSelectedProject> projects)
 		{
-			SelectProjectsDialog dialog = CreateSelectProjectsDialog(projects);
-			int result = MessageService.ShowCustomDialog(dialog);
-			return result == (int)Gtk.ResponseType.Ok;
+			using (SelectProjectsDialog dialog = CreateSelectProjectsDialog (projects)) {
+				int result = MessageService.ShowCustomDialog (dialog);
+				return result == (int)Gtk.ResponseType.Ok;
+			}
 		}
 		
 		SelectProjectsDialog CreateSelectProjectsDialog(IEnumerable<IPackageManagementSelectedProject> projects)

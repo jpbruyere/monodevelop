@@ -38,6 +38,8 @@ using Gtk;
 using MonoDevelop.Ide.Projects;
 using MonoDevelop.Ide.Desktop;
 using System.Linq;
+using MonoDevelop.Components;
+using MonoDevelop.Components.Extensions;
 
 namespace MonoDevelop.Ide.Commands
 {
@@ -79,7 +81,7 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			var dlg = new OpenFileDialog (GettextCatalog.GetString ("File to Open"), Gtk.FileChooserAction.Open) {
+			var dlg = new OpenFileDialog (GettextCatalog.GetString ("File to Open"), MonoDevelop.Components.FileChooserAction.Open) {
 				TransientFor = IdeApp.Workbench.RootWindow,
 				ShowEncodingSelector = true,
 				ShowViewerSelector = true,
@@ -107,8 +109,8 @@ namespace MonoDevelop.Ide.Commands
 	{
 		protected override void Run ()
 		{
-			var dlg = new NewFileDialog (null, null); // new file seems to fail if I pass the project IdeApp.ProjectOperations.CurrentSelectedProject
-			MessageService.ShowCustomDialog (dlg, IdeApp.Workbench.RootWindow);
+			using (var dlg = new NewFileDialog (null, null)) // new file seems to fail if I pass the project IdeApp.ProjectOperations.CurrentSelectedProject
+				MessageService.ShowCustomDialog (dlg, IdeApp.Workbench.RootWindow);
 		}
 	}
 
@@ -273,8 +275,12 @@ namespace MonoDevelop.Ide.Commands
 			
 			int i = 0;
 			foreach (var ri in files) {
-				string acceleratorKeyPrefix = i < 10 ? "_" + ((i + 1) % 10).ToString() + " " : "";
-				var cmd = new CommandInfo (acceleratorKeyPrefix + ri.DisplayName.Replace ("_", "__")) {
+				string commandText = ri.DisplayName.Replace ("_", "__");
+				if (!Platform.IsMac) {
+					string acceleratorKeyPrefix = i < 10 ? "_" + ((i + 1) % 10).ToString() + " " : "";
+					commandText = acceleratorKeyPrefix + commandText;
+				}
+				var cmd = new CommandInfo (commandText) {
 					Description = GettextCatalog.GetString ("Open {0}", ri.FileName)
 				};
 /*				Gdk.Pixbuf icon = DesktopService.GetIconForFile (ri.FileName, IconSize.Menu);
@@ -289,7 +295,7 @@ namespace MonoDevelop.Ide.Commands
 		
 		protected override void Run (object dataItem)
 		{
-			IdeApp.Workbench.OpenDocument ((string)dataItem);
+			IdeApp.Workbench.OpenDocument ((string)dataItem, project: null);
 		}
 	}
 	
@@ -336,8 +342,8 @@ namespace MonoDevelop.Ide.Commands
 				try {
 					if (!File.Exists (ri.FileName))
 						continue;
-					icon = IdeApp.Services.ProjectService.FileFormats.GetFileFormats
-						(ri.FileName, typeof(Solution)).Length > 0? "md-solution": "md-workspace";
+
+					icon = IdeApp.Services.ProjectService.FileIsObjectOfType (ri.FileName, typeof(Solution)) ? "md-solution": "md-workspace";
 				}
 				catch (UnauthorizedAccessException exAccess) {
 					LoggingService.LogWarning ("Error building recent solutions list (Permissions)", exAccess);
@@ -347,13 +353,18 @@ namespace MonoDevelop.Ide.Commands
 					LoggingService.LogWarning ("Error building recent solutions list", ex);
 					continue;
 				}
-				
-				string acceleratorKeyPrefix = i < 10 ? "_" + ((i + 1) % 10).ToString() + " " : "";
+
+				string commandText = ri.DisplayName.Replace ("_", "__");
+				if (!Platform.IsMac) {
+					string acceleratorKeyPrefix = i < 10 ? "_" + ((i + 1) % 10).ToString() + " " : "";
+					commandText = acceleratorKeyPrefix + commandText;
+				}
+
 				string str = GettextCatalog.GetString ("Load solution {0}", ri.ToString ());
 				if (IdeApp.Workspace.IsOpen)
 					str += " - " + GettextCatalog.GetString ("Hold Control to open in current workspace.");
 				
-				var cmd = new CommandInfo (acceleratorKeyPrefix + ri.DisplayName.Replace ("_", "__")) {
+				var cmd = new CommandInfo (commandText) {
 					Icon = icon,
 					Description = str,
 				};
@@ -365,7 +376,7 @@ namespace MonoDevelop.Ide.Commands
 		protected override void Run (object dataItem)
 		{
 			string filename = (string)dataItem;
-			Gdk.ModifierType mtype = Mono.TextEditor.GtkWorkarounds.GetCurrentKeyModifiers ();
+			Gdk.ModifierType mtype = GtkWorkarounds.GetCurrentKeyModifiers ();
 			bool inWorkspace = (mtype & Gdk.ModifierType.ControlMask) != 0;
 			IdeApp.Workspace.OpenWorkspaceItem (filename, !inWorkspace);
 		}

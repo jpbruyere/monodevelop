@@ -26,7 +26,7 @@
 
 using System;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Components.Commands;
 using MonoDevelop.Core;
 using MonoDevelop.Ide;
@@ -47,6 +47,7 @@ namespace MonoDevelop.PackageManagement.Commands
 		{
 			projectService.SolutionLoaded += SolutionLoaded;
 			projectService.SolutionUnloaded += SolutionUnloaded;
+			IdeApp.Workspace.ItemUnloading += WorkspaceItemUnloading;
 		}
 
 		void SolutionLoaded (object sender, EventArgs e)
@@ -61,7 +62,7 @@ namespace MonoDevelop.PackageManagement.Commands
 				// the check for updates starts. Otherwise the check for updates finishes
 				// before the solution loads and the status bar never reports that
 				// package updates were being checked.
-				DispatchService.BackgroundDispatch (() => {
+				PackageManagementBackgroundDispatcher.Dispatch (() => {
 					CheckForUpdates ();
 				});
 			}
@@ -90,7 +91,7 @@ namespace MonoDevelop.PackageManagement.Commands
 			bool checkUpdatesAfterRestore = ShouldCheckForUpdates && AnyProjectHasPackages ();
 
 			var restorer = new PackageRestorer (projectService.OpenSolution.Solution);
-			DispatchService.BackgroundDispatch (() => {
+			PackageManagementBackgroundDispatcher.Dispatch (() => {
 				restorer.Restore ();
 				if (checkUpdatesAfterRestore && !restorer.RestoreFailed) {
 					CheckForUpdates ();
@@ -112,7 +113,19 @@ namespace MonoDevelop.PackageManagement.Commands
 			try {
 				PackageManagementServices.UpdatedPackagesInSolution.CheckForUpdates ();
 			} catch (Exception ex) {
-				LoggingService.LogInternalError ("Check for NuGet package updates error.", ex);
+				LoggingService.LogError ("Check for NuGet package updates error.", ex);
+			}
+		}
+
+		void WorkspaceItemUnloading (object sender, ItemUnloadingEventArgs e)
+		{
+			try {
+				if (PackageManagementServices.BackgroundPackageActionRunner.IsRunning) {
+					MessageService.ShowMessage (GettextCatalog.GetString ("Unable to close the solution when NuGet packages are being processed."));
+					e.Cancel = true;
+				}
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error on unloading workspace item.", ex);
 			}
 		}
 	}

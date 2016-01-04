@@ -27,6 +27,8 @@ using System;
 using AppKit;
 using CoreGraphics;
 using Foundation;
+using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
 namespace MonoDevelop.MacIntegration.MainToolbar
 {
@@ -41,7 +43,15 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 		public override void ViewDidMoveToWindow ()
 		{
-			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notif => toolbarItem.UpdateWidth ());
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidResizeNotification, notif =>
+			                                                Runtime.RunInMainThread (() => toolbarItem.UpdateWidth ()));
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.WillEnterFullScreenNotification, notif =>
+				CenteringSpaceToolbarItem.WindowFullscreening = true);
+			NSNotificationCenter.DefaultCenter.AddObserver (NSWindow.DidEnterFullScreenNotification, notif => {
+				CenteringSpaceToolbarItem.WindowFullscreening = false;
+				Runtime.RunInMainThread (() => toolbarItem.UpdateWidth ());
+			});
+
 			base.ViewDidMoveToWindow ();
 		}
 	}
@@ -49,6 +59,7 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 	[Register]
 	class CenteringSpaceToolbarItem : NSToolbarItem
 	{
+		internal static bool WindowFullscreening;
 		public CenteringSpaceToolbarItem ()
 		{
 			Initialize ();
@@ -75,6 +86,12 @@ namespace MonoDevelop.MacIntegration.MainToolbar
 
 		public override CGSize MinSize {
 			get {
+				// Do NOT let this calculate any values while the window is fullscreening.
+				// Everything changes, and the size might end up with bogus values and cause a native crash
+				// that is totally unrelated. See BXC 29261.
+				if (WindowFullscreening)
+					return base.MinSize;
+
 				NSToolbarItem[] items = Toolbar.Items;
 				int index = Array.IndexOf (items, this);
 

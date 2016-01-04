@@ -159,7 +159,7 @@ namespace MonoDevelop.Ide.Navigation
 					return point;
 			}
 			
-			IEditableTextBuffer editBuf = doc.GetContent<IEditableTextBuffer> ();
+			var editBuf = doc.Editor;
 			if (editBuf != null) {
 				point = new TextFileNavigationPoint (doc, editBuf);
 				if (point != null)
@@ -291,8 +291,8 @@ namespace MonoDevelop.Ide.Navigation
 			currentDoc.Closed += HandleCurrentDocClosed;
 			
 			if (currentDoc.Editor != null) {
-				currentDoc.Editor.Document.TextReplaced += BufferTextChanged;
-				currentDoc.Editor.Caret.PositionChanged += BufferCaretPositionChanged;
+				currentDoc.Editor.TextChanged += BufferTextChanged;
+				currentDoc.Editor.CaretPositionChanged += BufferCaretPositionChanged;
 			}
 		}
 
@@ -308,8 +308,8 @@ namespace MonoDevelop.Ide.Navigation
 			
 			currentDoc.Closed -= HandleCurrentDocClosed;
 			if (currentDoc.Editor != null) {
-				currentDoc.Editor.Document.TextReplaced -= BufferTextChanged;
-				currentDoc.Editor.Caret.PositionChanged -= BufferCaretPositionChanged;
+				currentDoc.Editor.TextChanged -= BufferTextChanged;
+				currentDoc.Editor.CaretPositionChanged -= BufferCaretPositionChanged;
 			}
 			currentDoc = null;
 		}
@@ -349,12 +349,11 @@ namespace MonoDevelop.Ide.Navigation
 			bool closedHistoryChanged = false;
 			foreach (ProjectFileRenamedEventInfo args in e) {
 				foreach (NavigationHistoryItem point in history) {
-					DocumentNavigationPoint dp = point.NavigationPoint as DocumentNavigationPoint;
+					var dp = point.NavigationPoint as DocumentNavigationPoint;
 					historyChanged &= (dp != null && dp.HandleRenameEvent (args.OldName, args.NewName));
-				}
-				foreach (NavigationHistoryItem point in history) {
-					DocumentNavigationPoint cdp = point.NavigationPoint as DocumentNavigationPoint;
-					closedHistoryChanged &= (cdp != null && cdp.HandleRenameEvent (args.OldName, args.NewName));
+					closedHistoryChanged &= (dp != null && dp.HandleRenameEvent (args.OldName, args.NewName));
+					if (historyChanged && closedHistoryChanged)
+						break;
 				}
 			}
 			if (historyChanged)

@@ -29,8 +29,9 @@
 using System;
 using System.IO;
 using MonoDevelop.Core;
+using MonoDevelop.Ide;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public class PackageManagementFileService : IPackageManagementFileService
 	{
@@ -61,6 +62,18 @@ namespace ICSharpCode.PackageManagement
 		public void OnFileChanged (string path)
 		{
 			packageManagementEvents.OnFileChanged (path);
+		}
+
+		public bool FileExists (string path)
+		{
+			return File.Exists (path);
+		}
+
+		public void OpenFile (string path)
+		{
+			Runtime.RunInMainThread (() => {
+				IdeApp.Workbench.OpenDocument (path, null, true);
+			}).Wait ();
 		}
 	}
 }

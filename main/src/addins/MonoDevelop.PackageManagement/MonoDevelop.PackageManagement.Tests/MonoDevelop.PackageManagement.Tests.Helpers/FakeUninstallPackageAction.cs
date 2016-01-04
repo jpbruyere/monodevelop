@@ -25,7 +25,7 @@
 // THE SOFTWARE.
 
 using System;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
@@ -41,11 +41,14 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 		protected override void ExecuteCore ()
 		{
 			IsExecuted = true;
+			ExecuteAction ();
 		}
 
 		protected override void BeforeExecute ()
 		{
 		}
+
+		public Action ExecuteAction = () => { };
 	}
 }
 

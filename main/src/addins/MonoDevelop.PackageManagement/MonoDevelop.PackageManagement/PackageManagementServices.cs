@@ -31,7 +31,7 @@ using NuGet;
 using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public static class PackageManagementServices
 	{
@@ -81,6 +81,7 @@ namespace ICSharpCode.PackageManagement
 			projectOperations = new PackageManagementProjectOperations (solution, registeredPackageRepositories, backgroundPackageActionRunner, packageManagementEvents);
 
 			InitializeCredentialProvider();
+			PackageManagementBackgroundDispatcher.Initialize ();
 		}
 		
 		public static void InitializeCredentialProvider()
@@ -100,7 +101,7 @@ namespace ICSharpCode.PackageManagement
 			try {
 				return Settings.LoadDefaultSettings (null, null, null);
 			} catch (Exception ex) {
-				LoggingService.LogInternalError ("Unable to load NuGet.Config.", ex);
+				LoggingService.LogError ("Unable to load NuGet.Config.", ex);
 			}
 			return NullSettings.Instance;
 		}

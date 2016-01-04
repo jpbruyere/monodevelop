@@ -36,14 +36,12 @@ using Microsoft.Build.Logging;
 using Microsoft.Build.Execution;
 using System.Xml;
 
-namespace MonoDevelop.Projects.Formats.MSBuild
+namespace MonoDevelop.Projects.MSBuild
 {
 	public partial class ProjectBuilder: MarshalByRefObject, IProjectBuilder
 	{
 		readonly ProjectCollection engine;
 		readonly string file;
-		ILogWriter currentLogWriter;
-		readonly ConsoleLogger consoleLogger;
 		readonly BuildEngine buildEngine;
 
 		public ProjectBuilder (BuildEngine buildEngine, ProjectCollection engine, string file)
@@ -51,27 +49,26 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 			this.file = file;
 			this.engine = engine;
 			this.buildEngine = buildEngine;
-			consoleLogger = new ConsoleLogger (LoggerVerbosity.Normal, LogWriteLine, null, null);
 			Refresh ();
 		}
 
 		public MSBuildResult Run (
 			ProjectConfigurationInfo[] configurations, ILogWriter logWriter, MSBuildVerbosity verbosity,
-			string[] runTargets, string[] evaluateItems, string[] evaluateProperties)
+			string[] runTargets, string[] evaluateItems, string[] evaluateProperties, Dictionary<string,string> globalProperties, int taskId)
 		{
 			if (runTargets == null || runTargets.Length == 0)
 				throw new ArgumentException ("runTargets is empty");
 
 			MSBuildResult result = null;
-			BuildEngine.RunSTA (delegate {
+			BuildEngine.RunSTA (taskId, delegate {
 				try {
 					var project = SetupProject (configurations);
-					currentLogWriter = logWriter;
+					InitLogger (logWriter);
 
 					ILogger[] loggers;
 					var logger = new LocalLogger (file);
 					if (logWriter != null) {
-						consoleLogger.Verbosity = GetVerbosity (verbosity);
+						var consoleLogger = new ConsoleLogger (GetVerbosity (verbosity), LogWriteLine, null, null);
 						loggers = new ILogger[] { logger, consoleLogger };
 					} else {
 						loggers = new ILogger[] { logger };
@@ -80,6 +77,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 					//building the project will create items and alter properties, so we use a new instance
 					var pi = project.CreateProjectInstance ();
 
+					if (globalProperties != null)
+						foreach (var p in globalProperties)
+							pi.SetProperty (p.Key, p.Value);
+					
 					pi.Build (runTargets, loggers);
 
 					result = new MSBuildResult (logger.BuildResult.ToArray ());
@@ -110,11 +111,10 @@ namespace MonoDevelop.Projects.Formats.MSBuild
 						file, false, ex.ErrorSubcategory, ex.ErrorCode, ex.ProjectFile,
 						ex.LineNumber, ex.ColumnNumber, ex.EndLineNumber, ex.EndColumnNumber,
 						ex.BaseMessage, ex.HelpKeyword);
-					if (logWriter != null)
-						logWriter.WriteLine (r.ToString ());
+					LogWriteLine (r.ToString ());
 					result = new MSBuildResult (new [] { r });
 				} finally {
-					currentLogWriter = null;
+					DisposeLogger ();
 				}
 			});
 			return result;

@@ -27,7 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.PackageManagement.Tests.Helpers;
 using NUnit.Framework;
 using NuGet;
@@ -270,14 +270,14 @@ namespace MonoDevelop.PackageManagement.Tests
 		}
 
 		[Test]
-		public void Run_OneInstallActionWithPowerShellScripts_WarningReportedToProgressMonitor ()
+		public void Run_OneInstallActionWithPowerShellScripts_WarningNotReportedToProgressMonitor ()
 		{
 			CreateRunner ();
 			AddInstallActionWithPowerShellScript ();
 
 			Run ();
 
-			Assert.AreEqual ("Warning", progressMonitor.ReportedWarningMessage);
+			Assert.IsNull (progressMonitor.ReportedWarningMessage);
 		}
 
 		[Test]
@@ -288,7 +288,7 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			Run ();
 
-			progressMonitor.AssertMessageIsLogged ("Test Package contains PowerShell scripts which will not be run.");
+			progressMonitor.AssertMessageIsLogged ("WARNING: Test Package contains PowerShell scripts which will not be run.");
 		}
 
 		[Test]
@@ -491,6 +491,81 @@ namespace MonoDevelop.PackageManagement.Tests
 			Run ();
 
 			Assert.IsFalse (runner.EventsMonitor.IsTypeSystemRefreshed);
+		}
+
+		[Test]
+		public void IsRunning_NothingRunning_IsRunningIsFalse ()
+		{
+			CreateRunner ();
+
+			Assert.IsFalse (runner.IsRunning);
+		}
+
+		[Test]
+		public void IsRunning_OneUninstallActionAndRunNotCompleted_IsRunningIsTrue ()
+		{
+			CreateRunner ();
+			AddUninstallAction ();
+
+			RunWithoutBackgroundDispatch ();
+
+			Assert.IsTrue (runner.IsRunning);
+		}
+
+		[Test]
+		public void IsRunning_OneUninstallActionAndRunCompleted_IsRunningIsFalse ()
+		{
+			CreateRunner ();
+			AddUninstallAction ();
+
+			Run ();
+
+			Assert.IsFalse (runner.IsRunning);
+		}
+
+		[Test]
+		public void IsRunning_TwoRunsAndOneCompletes_IsRunningIsTrue ()
+		{
+			CreateRunner ();
+			AddUninstallAction ();
+			RunWithoutBackgroundDispatch ();
+			actions.Clear ();
+			AddInstallAction ();
+			RunWithoutBackgroundDispatch ();
+
+			runner.ExecuteSingleBackgroundDispatch ();
+
+			Assert.IsTrue (runner.IsRunning);
+		}
+
+		[Test]
+		public void IsRunning_TwoRunsAndBothComplete_IsRunningIsFalse ()
+		{
+			CreateRunner ();
+			AddUninstallAction ();
+			RunWithoutBackgroundDispatch ();
+			actions.Clear ();
+			AddInstallAction ();
+			RunWithoutBackgroundDispatch ();
+
+			runner.ExecuteSingleBackgroundDispatch ();
+			runner.ExecuteSingleBackgroundDispatch ();
+
+			Assert.IsFalse (runner.IsRunning);
+		}
+
+		[Test]
+		public void IsRunning_ExceptionThrownRunningBackgroundDispatcher_IsRunningIsFalse ()
+		{
+			CreateRunner ();
+			AddUninstallAction ();
+			runner.CreateEventMonitorAction = (monitor, packageManagementEvents, progressProvider) => {
+				throw new ApplicationException ("Error");
+			};
+
+			Run ();
+
+			Assert.IsFalse (runner.IsRunning);
 		}
 	}
 }

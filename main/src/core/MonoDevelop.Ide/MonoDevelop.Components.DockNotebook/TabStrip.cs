@@ -28,7 +28,6 @@ using System.Linq;
 using Gdk;
 using Gtk;
 using System;
-using Mono.TextEditor;
 using System.Collections.Generic;
 using Cairo;
 using MonoDevelop.Components;
@@ -441,8 +440,10 @@ namespace MonoDevelop.Components.DockNotebook
 
 				// If the user clicks and drags on the 'x' which closes the current
 				// tab we can end up with a null tab here
-				if (t == null)
+				if (t == null) {
+					TooltipText = null;
 					return base.OnMotionNotifyEvent (evnt);
+				}
 				SetHighlightedTab (t);
 
 				var newOver = IsOverCloseButton (t, (int)evnt.X, (int)evnt.Y);

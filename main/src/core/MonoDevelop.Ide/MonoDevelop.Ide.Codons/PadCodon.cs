@@ -43,7 +43,7 @@ using System.IO;
 namespace MonoDevelop.Ide.Codons
 {
 	[ExtensionNode ("Pad", "Registers a pad to be shown in the workbench.")]
-	public class PadCodon : ExtensionNode, IDockItemLabelProvider
+	public class PadCodon : ExtensionNode
 	{
 		IPadContent content;
 		string id;
@@ -70,15 +70,9 @@ namespace MonoDevelop.Ide.Codons
 		[NodeAttribute ("defaultStatus", "Default status ofthe pad. It can be 'Dockable', 'Floating', 'AutoHide'.")]
 		DockItemStatus defaultStatus = DockItemStatus.Dockable;
 		
-		[NodeAttribute("dockLabelProvider", "Name of a class implementing IDockItemLabelProvider. " +
-			"Using this class it is possible to use a custom widget as label when the item" +
-			"is docked in auto-hide mode.")]
-		string dockLabelProvider = null;
-		
 		[NodeAttribute ("defaultLayout", "Name of the layouts (comma separated list) on which this pad should be visible by default")]
 		string[] defaultLayouts;
 		
-		IDockItemLabelProvider cachedDockLabelProvider;
 		bool initializeCalled;
 		
 		public IPadContent PadContent {
@@ -169,15 +163,6 @@ namespace MonoDevelop.Ide.Codons
 			return (IPadContent) Addin.CreateInstance (className, true);
 		}
 		
-		Gtk.Widget IDockItemLabelProvider.CreateLabel (Gtk.Orientation orientation)
-		{
-			if (dockLabelProvider == null)
-				return null;
-			if (cachedDockLabelProvider == null)
-				cachedDockLabelProvider = (IDockItemLabelProvider) Addin.CreateInstance (dockLabelProvider, true);
-			return cachedDockLabelProvider.CreateLabel (orientation);
-		}
-
 		PadUserPrefs preferences = null;
 
 		internal void SetPreferences (PadUserPrefs pi)

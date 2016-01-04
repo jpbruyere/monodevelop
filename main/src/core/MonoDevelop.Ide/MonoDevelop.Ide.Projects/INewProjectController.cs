@@ -28,6 +28,7 @@
 using System.Collections.Generic;
 using MonoDevelop.Ide.Templates;
 using Xwt.Drawing;
+using System.Threading.Tasks;
 
 namespace MonoDevelop.Ide.Projects
 {
@@ -56,9 +57,11 @@ namespace MonoDevelop.Ide.Projects
 
 		WizardPage CurrentWizardPage { get; }
 
-		void Create ();
+		Task Create ();
 
 		Image GetImage (SolutionTemplate template);
+
+		IEnumerable<ProjectConfigurationControl> GetFinalPageControls ();
 	}
 }
 

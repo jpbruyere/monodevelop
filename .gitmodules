@@ -1,19 +1,13 @@
 [submodule "main/external/cecil"]
 	path = main/external/cecil
 	url = git://github.com/mono/cecil.git
-	branch = mono-3.0
+	branch = monodevelop
 [submodule "main/external/mono-tools"]
 	path = main/external/mono-tools
 	url = git://github.com/mono/mono-tools.git
-[submodule "main/external/ngit"]
-	path = main/external/ngit
-	url = git://github.com/mono/ngit.git
 [submodule "main/external/mdtestharness"]
 	path = main/external/mdtestharness
 	url = git://github.com/mono/mdtestharness.git
-[submodule "main/external/Newtonsoft.Json"]
-	path = main/external/Newtonsoft.Json
-	url = git://github.com/mono/Newtonsoft.Json.git
 [submodule "main/external/nrefactory"]
 	path = main/external/nrefactory
 	url = git://github.com/icsharpcode/NRefactory.git
@@ -32,7 +26,7 @@
 	url = git://github.com/mono/guiunit.git
 [submodule "main/external/fsharpbinding"]
 	path = main/external/fsharpbinding
-	url = git://github.com/fsharp/fsharpbinding.git
+	url = https://github.com/fsharp/xamarin-monodevelop-fsharp-addin.git
 	branch = master
 [submodule "main/external/nuget-binary"]
 	path = main/external/nuget-binary
@@ -47,3 +41,22 @@
 [submodule "main/external/sharpsvn-binary"]
 	path = main/external/sharpsvn-binary
 	url = git://github.com/mono/sharpsvn-binary.git
+[submodule "main/external/libgit2sharp"]
+	path = main/external/libgit2sharp
+	url = git://github.com/mono/libgit2sharp.git
+	branch = xs-5.10-v2
+[submodule "main/external/libgit-binary"]
+	path = main/external/libgit-binary
+	url = git://github.com/mono/libgit-binary.git
+[submodule "main/external/libgit2"]
+	path = main/external/libgit2
+	url = git://github.com/mono/libgit2.git
+	branch = xs-5.10-v2
+[submodule "main/external/RefactoringEssentials"]
+	path = main/external/RefactoringEssentials
+	url = git://github.com/icsharpcode/RefactoringEssentials.git
+	branch = monodevelop
+[submodule "main/external/roslyn"]
+	path = main/external/roslyn
+	url = git://github.com/mono/roslyn.git
+	branch = monodevelop_bin

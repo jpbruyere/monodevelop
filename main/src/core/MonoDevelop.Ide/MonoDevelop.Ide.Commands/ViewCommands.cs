@@ -149,6 +149,7 @@ namespace MonoDevelop.Ide.Commands
 					newLayoutName = dlg.LayoutName; 
 			} finally {
 				dlg.Destroy ();
+				dlg.Dispose ();
 			}
 			if (newLayoutName != null) {
 				IdeApp.Workbench.CurrentLayout = newLayoutName;
@@ -378,7 +379,7 @@ namespace MonoDevelop.Ide.Commands
 
 		protected override void Run ()
 		{
-			IdeApp.Workbench.ActiveDocument.Editor.SetCaretTo (IdeApp.Workbench.ActiveDocument.Editor.Caret.Line, IdeApp.Workbench.ActiveDocument.Editor.Caret.Column);
+			IdeApp.Workbench.ActiveDocument.Editor.StartCaretPulseAnimation ();
 		}
 
 	}

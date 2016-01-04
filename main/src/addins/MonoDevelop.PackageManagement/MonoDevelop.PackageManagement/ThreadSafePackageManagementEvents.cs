@@ -32,18 +32,17 @@ using MonoDevelop.Core;
 using MonoDevelop.Ide;
 using NuGet;
 using MonoDevelop.PackageManagement;
+using MonoDevelop.Projects;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public class ThreadSafePackageManagementEvents : IThreadSafePackageManagementEvents
 	{
-		static Action<MessageHandler> defaultGuiSyncDispatcher = DispatchService.GuiSyncDispatch;
-
 		Action<MessageHandler> guiSyncDispatcher;
 		IPackageManagementEvents unsafeEvents;
 
 		public ThreadSafePackageManagementEvents (IPackageManagementEvents unsafeEvents)
-			: this (unsafeEvents, defaultGuiSyncDispatcher)
+			: this (unsafeEvents, MonoDevelopProjectSystem.DefaultGuiSyncDispatcher)
 		{
 		}
 
@@ -297,6 +296,36 @@ namespace ICSharpCode.PackageManagement
 		public void OnPackageRestored (IPackage package)
 		{
 			unsafeEvents.OnPackageRestored (package);
+		}
+
+		public event EventHandler<DotNetProjectReferenceEventArgs> ReferenceAdding {
+			add { unsafeEvents.ReferenceAdding += value; }
+			remove { unsafeEvents.ReferenceAdding -= value; }
+		}
+
+		public event EventHandler<DotNetProjectReferenceEventArgs> ReferenceRemoving {
+			add { unsafeEvents.ReferenceRemoving += value; }
+			remove { unsafeEvents.ReferenceRemoving -= value; }
+		}
+
+		public void OnReferenceAdding (ProjectReference reference)
+		{
+			unsafeEvents.OnReferenceAdding (reference);
+		}
+
+		public void OnReferenceRemoving (ProjectReference reference)
+		{
+			unsafeEvents.OnReferenceRemoving (reference);
+		}
+
+		public event EventHandler<DotNetProjectImportEventArgs> ImportRemoved {
+			add { unsafeEvents.ImportRemoved += value; }
+			remove { unsafeEvents.ImportRemoved -= value; }
+		}
+
+		public void OnImportRemoved (IDotNetProject project, string import)
+		{
+			unsafeEvents.OnImportRemoved (project, import);
 		}
 	}
 }

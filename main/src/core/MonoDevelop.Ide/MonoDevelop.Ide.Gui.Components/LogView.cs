@@ -25,7 +25,6 @@
 // THE SOFTWARE.
 
 using System;
-using MonoDevelop.Ide.Gui.Pads;
 using Gtk;
 using Pango;
 using System.Collections.Generic;
@@ -69,49 +68,29 @@ namespace MonoDevelop.Ide.Gui.Components
 		/// </summary>
 		public class LogTextView : TextView
 		{
-			MonoDevelop.Components.ContextMenu context_menu;
-			MonoDevelop.Components.ContextMenuItem cut;
-			MonoDevelop.Components.ContextMenuItem copy;
-			MonoDevelop.Components.ContextMenuItem paste;
-			MonoDevelop.Components.ContextMenuItem select_all;
+			readonly CommandEntrySet menuSet;
 
 			public LogTextView (TextBuffer buf) : base (buf)
 			{
+				menuSet = new CommandEntrySet ();
 				SetupMenu ();
 			}
 
 			public LogTextView () 
 			{
+				menuSet = new CommandEntrySet ();
 				SetupMenu ();
 			}
 
 			void SetupMenu ()
 			{
-				context_menu = new MonoDevelop.Components.ContextMenu ();
-				cut = new MonoDevelop.Components.ContextMenuItem { Label = GettextCatalog.GetString ("Cut") };
-				cut.Clicked += (sender, e) => CopyText ();
-				context_menu.Items.Add (cut);
-
-				copy = new MonoDevelop.Components.ContextMenuItem { Label = GettextCatalog.GetString ("Copy") };
-				copy.Clicked += (sender, e) => CutText ();
-				context_menu.Items.Add (copy);
-
-				paste = new MonoDevelop.Components.ContextMenuItem { Label = GettextCatalog.GetString ("Paste") };
-				paste.Clicked += (sender, e) => PasteText ();
-				context_menu.Items.Add (paste);
-
-				select_all = new MonoDevelop.Components.ContextMenuItem { Label = GettextCatalog.GetString ("Select All") };
-				select_all.Clicked += (sender, e) => SelectAllText ();
-				context_menu.Items.Add (select_all);
+				menuSet.AddItem (EditCommands.Copy);
+				menuSet.AddItem (EditCommands.Cut);
+				menuSet.AddItem (EditCommands.Paste);
+				menuSet.AddItem (EditCommands.SelectAll);
 			}
 
-			void UpdateMenuItemSensitivities ()
-			{
-				select_all.Sensitive = (Buffer.CharCount > 0);
-				cut.Sensitive = copy.Sensitive = (Buffer.CharCount > 0 && Buffer.HasSelection);
-				paste.Sensitive = this.Editable;
-			}
-
+			[CommandHandler (EditCommands.SelectAll)]
 			void SelectAllText ()
 			{
 				TextIter start;
@@ -121,6 +100,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				Buffer.SelectRange (start, end);
 			}
 
+			[CommandHandler (EditCommands.Copy)]
 			void CopyText ()
 			{
 				TextIter start;
@@ -131,11 +111,15 @@ namespace MonoDevelop.Ide.Gui.Components
 					var clipboard = Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
 					clipboard.Text = text;
 
-					clipboard = Clipboard.Get (Gdk.Atom.Intern ("PRIMARY", false));
-					clipboard.Text = text;
+					if (Platform.IsLinux) {
+						// gtk has different clipboards for CLIPBOARD and PRIMARY only on Linux.
+						clipboard = Clipboard.Get (Gdk.Atom.Intern ("PRIMARY", false));
+						clipboard.Text = text;
+					}
 				}
 			}
 
+			[CommandHandler (EditCommands.Cut)]
 			void CutText ()
 			{
 				if (Buffer.HasSelection) {
@@ -144,6 +128,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				}
 			}
 
+			[CommandHandler (EditCommands.Paste)]
 			void PasteText ()
 			{
 				var clipboard = Clipboard.Get (Gdk.Atom.Intern ("CLIPBOARD", false));
@@ -169,8 +154,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 			{
 				if (evnt.Type == Gdk.EventType.ButtonPress && evnt.Button == 3) {
-					UpdateMenuItemSensitivities ();
-					context_menu.Show (this, evnt);
+					IdeApp.CommandService.ShowContextMenu (this, evnt, menuSet, this);
 
 					return false;
 				} else if (evnt.Type == Gdk.EventType.TwoButtonPress) {
@@ -246,7 +230,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			endMark = buffer.CreateMark ("end-mark", buffer.EndIter, false);
 
 			UpdateCustomFont ();
-			IdeApp.Preferences.CustomOutputPadFontChanged += HandleCustomFontChanged;
+			IdeApp.Preferences.CustomOutputPadFont.Changed += HandleCustomFontChanged;
 			
 			outputDispatcher = new GLib.TimeoutHandler (outputDispatchHandler);
 
@@ -444,7 +428,7 @@ namespace MonoDevelop.Ide.Gui.Components
 		}
 		#endregion
 
-		public LogViewProgressMonitor GetProgressMonitor ()
+		public OutputProgressMonitor GetProgressMonitor ()
 		{
 			return new LogViewProgressMonitor (this);
 		}
@@ -634,7 +618,7 @@ namespace MonoDevelop.Ide.Gui.Components
 				updates.Clear ();
 				lastTextWrite = null;
 			}
-			IdeApp.Preferences.CustomOutputPadFontChanged -= HandleCustomFontChanged;
+			IdeApp.Preferences.CustomOutputPadFont.Changed -= HandleCustomFontChanged;
 		}
 		
 		abstract class QueuedUpdate
@@ -691,109 +675,143 @@ namespace MonoDevelop.Ide.Gui.Components
 		}
 	}
 
-	public class LogViewProgressMonitor : NullProgressMonitor, IDebugConsole
+	public class LogViewProgressMonitor : OutputProgressMonitor
 	{
 		LogView outputPad;
-		event EventHandler stopRequested;
-		
-		LogTextWriter logger = new LogTextWriter ();
+
 		LogTextWriter internalLogger = new LogTextWriter ();
-		LogTextWriter errorLogger = new LogTextWriter();
 		NotSupportedTextReader inputReader = new NotSupportedTextReader ();
+		OperationConsole console;
 		
-		public LogView LogView {
+		internal LogView LogView {
 			get { return outputPad; }
 		}
 		
-		public LogViewProgressMonitor (LogView pad)
+		internal LogViewProgressMonitor (LogView pad): base (Runtime.MainSynchronizationContext)
 		{
 			outputPad = pad;
 			outputPad.Clear ();
-			logger.TextWritten += outputPad.WriteText;
 			internalLogger.TextWritten += outputPad.WriteConsoleLogText;
-			errorLogger.TextWritten += outputPad.WriteError;
+			console = new LogViewProgressConsole (this);
 		}
-		
-		public override void BeginTask (string name, int totalWork)
+
+		public override OperationConsole Console {
+			get { return console; }
+		}
+
+		internal void Cancel ()
+		{
+			CancellationTokenSource.Cancel ();
+		}
+
+		protected override void OnWriteLog (string message)
+		{
+			outputPad.WriteText (message);
+			base.OnWriteLog (message);
+		}
+
+		protected override void OnWriteErrorLog (string message)
+		{
+			outputPad.WriteText (message);
+			base.OnWriteErrorLog (message);
+		}
+
+		protected override void OnBeginTask (string name, int totalWork, int stepWork)
 		{
 			if (outputPad == null) throw GetDisposedException ();
 			outputPad.BeginTask (name, totalWork);
-			base.BeginTask (name, totalWork);
+			base.OnBeginTask (name, totalWork, stepWork);
 		}
-		
-		public override void EndTask ()
+
+		protected override void OnEndTask (string name, int totalWork, int stepWork)
 		{
 			if (outputPad == null) throw GetDisposedException ();
 			outputPad.EndTask ();
-			base.EndTask ();
+			base.OnEndTask (name, totalWork, stepWork);
+		}
+
+		Exception GetDisposedException ()
+		{
+			return new InvalidOperationException ("Output progress monitor already disposed.");
 		}
 		
 		protected override void OnCompleted ()
 		{
 			if (outputPad == null) throw GetDisposedException ();
 			outputPad.WriteText ("\n");
-			
-			foreach (string msg in Messages)
+
+			foreach (string msg in SuccessMessages)
 				outputPad.WriteText (msg + "\n");
-			
+
 			foreach (string msg in Warnings)
 				outputPad.WriteText (msg + "\n");
-			
+
 			foreach (ProgressError msg in Errors)
 				outputPad.WriteError (msg.Message + "\n");
 			
 			base.OnCompleted ();
-			
-			outputPad = null;
-		}
-		
-		Exception GetDisposedException ()
-		{
-			return new InvalidOperationException ("Output progress monitor already disposed.");
-		}
-		
-		protected override void OnCancelRequested ()
-		{
-			base.OnCancelRequested ();
-			if (stopRequested != null)
-				stopRequested (this, null);
-		}
-		
-		public override TextWriter Log {
-			get { return logger; }
-		}
-		
-		TextWriter IConsole.Log {
-			get { return internalLogger; }
-		}
-		
-		TextReader IConsole.In {
-			get { return inputReader; }
-		}
-		
-		TextWriter IConsole.Out {
-			get { return logger; }
-		}
-		
-		TextWriter IConsole.Error {
-			get { return errorLogger; }
-		} 
 
-		void IDebugConsole.Debug (int level, string category, string message)
+			outputPad = null;
+
+			if (Completed != null)
+				Completed (this, EventArgs.Empty);
+		}
+
+		public override void Dispose ()
 		{
-			outputPad.WriteDebug (level, category, message);
+			base.Dispose ();
+			console.Dispose ();
 		}
-		
-		bool IConsole.CloseOnDispose {
-			get { return false; }
-		}
-		
-		event EventHandler IConsole.CancelRequested {
-			add { stopRequested += value; }
-			remove { stopRequested -= value; }
+
+		internal event EventHandler Completed;
+
+		class LogViewProgressConsole: OperationConsole
+		{
+			LogViewProgressMonitor monitor;
+
+			public LogViewProgressConsole (LogViewProgressMonitor monitor)
+			{
+				this.monitor = monitor;
+				CancellationSource = monitor.CancellationTokenSource;
+			}
+
+			public override TextReader In {
+				get {
+					return monitor.inputReader;
+				}
+			}
+			public override TextWriter Out {
+				get {
+					return monitor.Log;
+				}
+			}
+			public override TextWriter Error {
+				get {
+					return monitor.ErrorLog;
+				}
+			}
+			public override TextWriter Log {
+				get {
+					return monitor.internalLogger;
+				}
+			}
+
+			public override void Debug (int level, string category, string message)
+			{
+				monitor.outputPad.WriteDebug (level, category, message);
+			}
+
+			public override void Dispose ()
+			{
+				if (monitor != null) {
+					var m = monitor; // Avoid recursive dispose, since the monitor also disposes this console
+					monitor = null;
+					m.Dispose ();
+				}
+				base.Dispose ();
+			}
 		}
 	}
-
 	
 	class NotSupportedTextReader: TextReader
 	{

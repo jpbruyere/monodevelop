@@ -28,6 +28,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Xml;
 using System.Collections.Generic;
 
@@ -72,14 +73,14 @@ namespace MonoDevelop.Ide.Templates
 		public abstract string Name { get; }
 		
 		public abstract void Load (XmlElement filenode, FilePath baseDirectory);
-		public abstract bool AddToProject (SolutionItem policyParent, Project project, string language, string directory, string name);
+		public abstract bool AddToProject (SolutionFolderItem policyParent, Project project, string language, string directory, string name);
 		public abstract void Show ();
 
 		internal string CreateCondition { get; private set; }
 		
 		public virtual bool IsValidName (string name, string language)
 		{
-			return name.Length > 0 && name.IndexOfAny (Path.GetInvalidFileNameChars ()) == -1;
+			return FileService.IsValidFileName (name);
 /*			if (name.Length > 0) {
 				if (language != null && language.Length > 0) {
 					IDotNetLanguageBinding binding = LanguageBindingService.GetBindingPerLanguageName (language) as IDotNetLanguageBinding;
@@ -110,6 +111,11 @@ namespace MonoDevelop.Ide.Templates
 		internal virtual void SetProjectTagModel (IStringTagModel tagModel)
 		{
 			ProjectTagModel = tagModel;
+		}
+
+		internal bool EvaluateCreateCondition ()
+		{
+			return TemplateConditionEvaluator.EvaluateCondition (ProjectTagModel, CreateCondition);
 		}
 	}
 }

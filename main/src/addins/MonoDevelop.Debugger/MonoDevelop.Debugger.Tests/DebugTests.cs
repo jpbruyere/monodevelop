@@ -204,9 +204,16 @@ namespace MonoDevelop.Debugger.Tests
 			};
 
 			Session.TargetStopped += (sender, e) => {
-				Frame = e.Backtrace.GetFrame (0);
-				lastStoppedPosition = Frame.SourceLocation;
-				targetStoppedEvent.Set ();
+				//This can be null in case of ForcedStop
+				//which is called when exception is thrown
+				//when Continue & Stepping is executed
+				if (e.Backtrace != null) {
+					Frame = e.Backtrace.GetFrame (0);
+					lastStoppedPosition = Frame.SourceLocation;
+					targetStoppedEvent.Set ();
+				} else {
+					Console.WriteLine ("e.Backtrace is null");
+				}
 			};
 
 			var targetExited = new ManualResetEvent (false);
@@ -215,6 +222,10 @@ namespace MonoDevelop.Debugger.Tests
 			};
 
 			Session.Run (dsi, ops);
+			Session.ExceptionHandler = (ex) => {
+				Console.WriteLine ("Session.ExceptionHandler:" + Environment.NewLine + ex.ToString ());
+				return true;
+			};
 			switch (WaitHandle.WaitAny (new WaitHandle[]{ done, targetExited }, 30000)) {
 			case 0:
 				//Breakpoint is hit good... run tests now
@@ -223,6 +234,9 @@ namespace MonoDevelop.Debugger.Tests
 				throw new Exception ("Test application exited before hitting breakpoint");
 			default:
 				throw new Exception ("Timeout while waiting for initial breakpoint");
+			}
+			if (Session is SoftDebuggerSession) {
+				Console.WriteLine ("SDB protocol version:" + ((SoftDebuggerSession)Session).ProtocolVersion);
 			}
 		}
 
@@ -283,9 +297,16 @@ namespace MonoDevelop.Debugger.Tests
 			return Frame.GetExpressionValue (exp, true).Sync ();
 		}
 
+		public void WaitStop (int miliseconds)
+		{
+			if (!targetStoppedEvent.WaitOne (miliseconds)) {
+				Assert.Fail ("WaitStop failure: Target stop timeout");
+			}
+		}
+
 		public bool CheckPosition (string guid, int offset = 0, string statement = null, bool silent = false)
 		{
-			if (!targetStoppedEvent.WaitOne (3000)) {
+			if (!targetStoppedEvent.WaitOne (6000)) {
 				if (!silent)
 					Assert.Fail ("CheckPosition failure: Target stop timeout");
 				return false;
@@ -394,6 +415,13 @@ namespace MonoDevelop.Debugger.Tests
 
 	static class EvalHelper
 	{
+		public static bool AtLeast (this Version ver, int major, int minor) {
+			if ((ver.Major > major) || ((ver.Major == major && ver.Minor >= minor)))
+				return true;
+			else
+				return false;
+		}
+
 		public static ObjectValue Sync (this ObjectValue val)
 		{
 			if (!val.IsEvaluating)
@@ -410,7 +438,7 @@ namespace MonoDevelop.Debugger.Tests
 
 			lock (locker) {
 				while (val.IsEvaluating) {
-					if (!Monitor.Wait (locker, 4000))
+					if (!Monitor.Wait (locker, 8000))
 						throw new Exception ("Timeout while waiting for value evaluation");
 				}
 			}

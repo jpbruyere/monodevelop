@@ -33,7 +33,7 @@ using System.Runtime.Versioning;
 
 using NuGet;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public class PackageFromRepository : IPackageFromRepository
 	{
@@ -230,6 +230,11 @@ namespace ICSharpCode.PackageManagement
 				}
 				return true;
 			}
+		}
+
+		public void ExtractContents (IFileSystem fileSystem, string extractPath)
+		{
+			package.ExtractContents (fileSystem, extractPath);
 		}
 	}
 }

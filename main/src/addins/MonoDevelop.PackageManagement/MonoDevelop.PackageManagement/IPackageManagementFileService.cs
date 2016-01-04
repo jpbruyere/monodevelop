@@ -28,12 +28,14 @@
 
 using System;
 
-namespace ICSharpCode.PackageManagement
+namespace MonoDevelop.PackageManagement
 {
 	public interface IPackageManagementFileService
 	{
 		void RemoveFile(string path);
 		void RemoveDirectory(string path);
 		void OnFileChanged(string path);
+		void OpenFile (string path);
+		bool FileExists (string path);
 	}
 }

@@ -28,7 +28,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
-using ICSharpCode.PackageManagement;
+using MonoDevelop.PackageManagement;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Assemblies;
 using MonoDevelop.PackageManagement.Tests.Helpers;
@@ -372,7 +372,7 @@ namespace MonoDevelop.PackageManagement.Tests
 
 			Run ();
 
-			Assert.AreEqual ("Incompatible packages found. Please see Package Console for details.", progressMonitor.ReportedErrorMessage);
+			Assert.AreEqual ("Incompatible packages found.", progressMonitor.ReportedErrorMessage);
 			Assert.IsTrue (runner.PackageConsoleIsShown);
 		}
 	}

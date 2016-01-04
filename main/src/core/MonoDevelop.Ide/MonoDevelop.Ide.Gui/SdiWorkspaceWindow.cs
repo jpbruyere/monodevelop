@@ -121,7 +121,10 @@ namespace MonoDevelop.Ide.Gui
 			Add (box);
 			
 			SetTitleEvent(null, null);
+		}
 
+		internal void CreateCommandHandler ()
+		{
 			commandHandler = new ViewCommandHandlers (this);
 		}
 
@@ -261,8 +264,16 @@ namespace MonoDevelop.Ide.Gui
 		public void SelectWindow()
 		{
 			var window = tabControl.Toplevel as Gtk.Window;
-			if (window != null)
-				window.Present ();
+			if (window != null) {
+				if (window is DockWindow)
+					DesktopService.GrabDesktopFocus (window);
+
+				#if MAC
+				AppKit.NSWindow nswindow = MonoDevelop.Components.Mac.GtkMacInterop.GetNSWindow (window);
+				if (nswindow != null)
+					nswindow.MakeFirstResponder (nswindow.ContentView);
+				#endif
+			}	
 
 			// The tab change must be done now to ensure that the content is created
 			// before exiting this method.
@@ -473,7 +484,6 @@ namespace MonoDevelop.Ide.Gui
 				GLib.Source.Remove (present_timeout);
 			}
 
-			base.OnDestroyed ();
 			if (viewContents != null) {
 				foreach (IAttachableViewContent sv in SubViewContents) {
 					sv.Dispose ();
@@ -500,6 +510,7 @@ namespace MonoDevelop.Ide.Gui
 			commandHandler = null;
 			document = null;
 			extensionContext = null;
+			base.OnDestroyed ();
 		}
 		
 		#region lazy UI element creation
