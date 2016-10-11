@@ -40,6 +40,13 @@
 			<Description>A subclass of MonoDevelop.Components.Commands.CommandHandler</Description>
 		</ExtensionNode>
 	</ExtensionPoint>
+
+	<ExtensionPoint path = "/MonoDevelop/Ide/PreStartupHandlers" name = "Pre-startup handlers">
+		<Description>Commands to be automatically executed before the IDE UI is initialized. </Description>>
+		<ExtensionNode name="Class" objectType="MonoDevelop.Components.Commands.CommandHandler" customAttributeType="MonoDevelop.Ide.Extensions.StartupHandlerExtensionAttribute">
+			<Description>A subclass of MonoDevelop.Components.Commands.CommandHandler</Description>
+		</ExtensionNode>
+	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/Ide/InitCompleteHandlers" name = "Post inialization handlers">
 		<Description>Commands to be automatically executed when the IDE finishes initalization.</Description>
@@ -96,6 +103,11 @@
 		<ExtensionNode name="Customizer" type="MonoDevelop.Ide.Execution.ExecutionCommandCustomizer" objectType="MonoDevelop.Ide.Execution.IExecutionCommandCustomizer"/>
 	</ExtensionPoint>
 	
+	<ExtensionPoint path = "/MonoDevelop/Ide/RunConfigurationEditors" name = "Run Configuration Editors">
+		<Description>Widgets which allow editing run configurations.</Description>
+		<ExtensionNode name="Class" type="MonoDevelop.Ide.Extensions.RunConfigurationEditorExtensionNode" objectType="MonoDevelop.Ide.Execution.RunConfigurationEditor"/>
+	</ExtensionPoint>
+	
 	<ExtensionPoint path = "/MonoDevelop/Ide/CodeTemplates" name = "Code Templates">
 		<Description>Custom code templates.</Description>
 		<ExtensionNode name="CodeTemplate" type="MonoDevelop.Ide.CodeTemplates.CodeTemplateCodon"/>
@@ -112,7 +124,7 @@
 	</ExtensionPoint>
 	
 	<ExtensionPoint path = "/MonoDevelop/Ide/CustomTools" name = "Custom code generation tools">
-		<Description>Extensions to the text editor. Classes must be a subclass of TextEditorExtension.</Description>
+		<Description>Custom code generation tools. Classes must be a subclass of SingleProjectFileCustomTool or ISingleFileCustomTool.</Description>
 		<ExtensionNode name="Tool" type="MonoDevelop.Ide.Extensions.CustomToolExtensionNode"/>
 	</ExtensionPoint>
 	
@@ -170,11 +182,6 @@
 		<ExtensionNode name="Templates" type="MonoDevelop.Ide.Editor.Highlighting.TemplateCodon"/>
 	</ExtensionPoint>
 
-	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/CustomModes" name = "Text editor custom syntax modes">
-		<Description>Styles</Description>
-		<ExtensionNode name="SyntaxMode" type="MonoDevelop.Ide.Editor.Highlighting.SyntaxModeCodon"/>
-	</ExtensionPoint>
-
 	<ExtensionPoint path = "/MonoDevelop/SourceEditor2/EditorFactory" name = "Editor factories">
 		<Description>Allows providing a platform-specific implementation for the text editor</Description>
 		<ExtensionNode name="Class" />
@@ -196,6 +203,11 @@
 	<ExtensionPoint path = "/MonoDevelop/Ide/AutoInsertBracketHandler" name = "Automatic bracket handler">
 		<Description>Algorithm for providing automatic bracket insertion.</Description>
 		<ExtensionNode name="Class"/>
+	</ExtensionPoint>
+
+	<ExtensionPoint path = "/MonoDevelop/Ide/ErrorDocumentationProvider" name = "Link to documentation">
+		<Description>Send users to the appropriate documentation for errors in the error pad.</Description>
+		<ExtensionNode name = "ErrorDocumentationProvider" type = "MonoDevelop.Ide.Extensions.ErrorDocumentationProvider" />
 	</ExtensionPoint>
 
 	<!-- Extensions -->
@@ -226,8 +238,13 @@
 	<Extension path = "/MonoDevelop/Ide/KeyBindingSchemes">
 		<Scheme id="Emacs" _name = "GNU/Emacs" resource="KeyBindingSchemeEmacs.xml"/>
 		<Scheme id="VS05" _name = "Visual Studio" resource="KeyBindingSchemeVisualStudio.xml"/>
+		<Scheme id="VS14MAC" _name = "Visual Studio" resource="KeyBindingSchemeVisualStudio-mac.xml" forMac="true"/>
+		<Scheme id="VS14MAC2" _name = "Visual Studio (Windows)" resource="KeyBindingSchemeVisualStudio.xml" forMac="true"/>
 		<Scheme id="MD1" _name = "MonoDevelop 1.0" resource="KeyBindingSchemeMonoDevelop1.xml"/>
 		<Scheme id="MD2" _name = "MonoDevelop 2.0" resource="KeyBindingSchemeMonoDevelop2.xml"/>
+		<Scheme id="Xcode" _name = "Xcode" resource="KeyBindingSchemeXcode.xml" forMac="true"/>
+		<Scheme id="VSCodeMAC" _name = "Visual Studio Code" resource="KeyBindingSchemeVSCode-mac.xml" forMac="true"/>
+		<Scheme id="RiderMAC" _name = "ReSharper / Rider" resource="KeyBindingSchemeRider-mac.xml" forMac="true"/>
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Ide/TaskList/View">
@@ -293,7 +310,10 @@
 	
 	<Extension path = "/MonoDevelop/Ide/ExecutionCommandEditors">
 		<Customizer id="MonoDevelop.Ide.Execution.CustomArgsCustomizer" _name="Arguments" />
-		<Customizer id="MonoDevelop.Ide.Execution.MonoExecutionCustomizer" _name="Mono Options" />
+	</Extension>
+	
+	<Extension path = "/MonoDevelop/Ide/RunConfigurationEditors">
+		<Class class="MonoDevelop.Ide.Projects.OptionPanels.AssemblyRunConfigurationEditor" runConfigurationType="MonoDevelop.Projects.AssemblyRunConfiguration" />
 	</Extension>
 	
 	<Extension path="/MonoDevelop/Ide/Fonts">
@@ -338,5 +358,9 @@
 	<Extension path = "/MonoDevelop/Ide/CompletionCharacters">
 		<Complete id="Other" language="Other" commitOnSpace="True" commitChars="{}[]().,:;+-*/%&amp;|^!~=&lt;&gt;?@#'&quot;\"/>
 	</Extension>
-	
+
+	<ExtensionPoint path = "/MonoDevelop/Ide/LocaleSet" name = "Localization set definition">
+		<Description>Setting what languages are supported for user selection.</Description>
+		<ExtensionNode name = "Class" objectType = "MonoDevelop.Ide.LocaleSetProvider" />
+	</ExtensionPoint>
 </ExtensionModel>

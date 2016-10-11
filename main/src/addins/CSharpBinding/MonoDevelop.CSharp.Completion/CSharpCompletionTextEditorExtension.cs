@@ -278,18 +278,6 @@ namespace MonoDevelop.CSharp.Completion
 			HandleDocumentParsed (null, null);
 		}
 		
-		public override bool KeyPress (KeyDescriptor descriptor)
-		{
-			bool result = base.KeyPress (descriptor);
-			
-			if (/*EnableParameterInsight &&*/ (descriptor.KeyChar == ',' || descriptor.KeyChar == ')') && CanRunParameterCompletionCommand ())
-				base.RunParameterCompletionCommand ();
-			
-//			if (IsInsideComment ())
-//				ParameterInformationWindowManager.HideWindow (CompletionWidget);
-			return result;
-		}
-		
 		public override Task<ICompletionDataList> HandleCodeCompletionAsync (CodeCompletionContext completionContext, char completionChar, CancellationToken token = default(CancellationToken))
 		{
 //			if (!EnableCodeCompletion)
@@ -362,7 +350,7 @@ namespace MonoDevelop.CSharp.Completion
 				//				timer.Dispose ();
 			}		}
 
-		class CSharpCompletionDataList : CompletionDataList
+		internal class CSharpCompletionDataList : CompletionDataList
 		{
 		}
 
@@ -372,7 +360,7 @@ namespace MonoDevelop.CSharp.Completion
 		}
 
 
-		void AddImportCompletionData (CompletionResult completionResult, CSharpCompletionDataList result, RoslynCodeCompletionFactory factory, SemanticModel semanticModel, int position, CancellationToken cancellationToken = default(CancellationToken))
+		internal void AddImportCompletionData (CompletionResult completionResult, CSharpCompletionDataList result, RoslynCodeCompletionFactory factory, SemanticModel semanticModel, int position, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			if (result.Count == 0)
 				return;
@@ -391,6 +379,9 @@ namespace MonoDevelop.CSharp.Completion
 			if (extensionMethodImport) {
 				var memberAccess = completionResult.SyntaxContext.TargetToken.Parent as MemberAccessExpressionSyntax;
 				if (memberAccess != null) {
+					var symbolInfo = completionResult.SyntaxContext.SemanticModel.GetSymbolInfo (memberAccess.Expression);
+					if (symbolInfo.Symbol.Kind == SymbolKind.NamedType)
+						return;
 					extensionType = completionResult.SyntaxContext.SemanticModel.GetTypeInfo (memberAccess.Expression).Type;
 					if (extensionType == null) {
 						return;
@@ -478,7 +469,7 @@ namespace MonoDevelop.CSharp.Completion
 
 		Task<ICompletionDataList> InternalHandleCodeCompletion (CodeCompletionContext completionContext, char completionChar, bool ctrlSpace, int triggerWordLength, CancellationToken token, bool forceSymbolCompletion = false)
 		{
-			if (Editor.EditMode != MonoDevelop.Ide.Editor.EditMode.Edit)
+			if (Editor.EditMode == MonoDevelop.Ide.Editor.EditMode.CursorInsertion)
 				return Task.FromResult ((ICompletionDataList)null);
 //			var data = Editor;
 //			if (data.CurrentMode is TextLinkEditMode) {
@@ -723,32 +714,33 @@ namespace MonoDevelop.CSharp.Completion
 			return InternalHandleParameterCompletionCommand (completionContext, completionChar, false, token);
 		}
 
-		public async Task<MonoDevelop.Ide.CodeCompletion.ParameterHintingResult> InternalHandleParameterCompletionCommand (CodeCompletionContext completionContext, char completionChar, bool force, CancellationToken token = default(CancellationToken))
+		public Task<MonoDevelop.Ide.CodeCompletion.ParameterHintingResult> InternalHandleParameterCompletionCommand (CodeCompletionContext completionContext, char completionChar, bool force, CancellationToken token = default(CancellationToken))
 		{
 			var data = Editor;
-			if (!force && completionChar != '(' && completionChar != ',')
+			if (!force && completionChar != '(' && completionChar != '<' && completionChar != '[' && completionChar != ',')
 				return null;
 			if (Editor.EditMode != EditMode.Edit)
 				return null;
 			var offset = Editor.CaretOffset;
 			try {
-
 				var analysisDocument = DocumentContext.AnalysisDocument;
 				if (analysisDocument == null)
 					return null;
-				var partialDoc = await WithFrozenPartialSemanticsAsync (analysisDocument, token);
-				var semanticModel = await partialDoc.GetSemanticModelAsync ();
-				var engine = new ParameterHintingEngine (MonoDevelop.Ide.TypeSystem.TypeSystemService.Workspace, new RoslynParameterHintingFactory ());
-				var result = await engine.GetParameterDataProviderAsync (analysisDocument, semanticModel, offset, token);
-				return new MonoDevelop.Ide.CodeCompletion.ParameterHintingResult (result.OfType<MonoDevelop.Ide.CodeCompletion.ParameterHintingData>().ToList (), result.StartOffset);
+				return Task.Run (async delegate {
+					var partialDoc = await WithFrozenPartialSemanticsAsync (analysisDocument, token);
+					var semanticModel = await partialDoc.GetSemanticModelAsync ();
+					var engine = new ParameterHintingEngine (MonoDevelop.Ide.TypeSystem.TypeSystemService.Workspace, new RoslynParameterHintingFactory ());
+					var result = await engine.GetParameterDataProviderAsync (analysisDocument, semanticModel, offset, token);
+					return new MonoDevelop.Ide.CodeCompletion.ParameterHintingResult (result.OfType<MonoDevelop.Ide.CodeCompletion.ParameterHintingData> ().ToList (), result.StartOffset);
+				}, token);
 			} catch (Exception e) {
 				LoggingService.LogError ("Unexpected parameter completion exception." + Environment.NewLine + 
 					"FileName: " + DocumentContext.Name + Environment.NewLine + 
 					"Position: line=" + completionContext.TriggerLine + " col=" + completionContext.TriggerLineOffset + Environment.NewLine + 
 					"Line text: " + Editor.GetLineText (completionContext.TriggerLine), 
 					e);
+				return null;
 			}
-			return null;
 		}
 		
 //		List<string> GetUsedNamespaces ()
@@ -774,8 +766,8 @@ namespace MonoDevelop.CSharp.Completion
 			var caretOffset = Editor.CaretOffset;
 			if (analysisDocument == null || startOffset > caretOffset)
 				return -1;
-			var partialDoc = await WithFrozenPartialSemanticsAsync (analysisDocument, default(CancellationToken)).ConfigureAwait (false);
-			var result = ParameterUtil.GetCurrentParameterIndex (partialDoc, startOffset, caretOffset).Result;
+			var partialDoc = await WithFrozenPartialSemanticsAsync (analysisDocument, token).ConfigureAwait (false);
+			var result = await ParameterUtil.GetCurrentParameterIndex (partialDoc, startOffset, caretOffset, token).ConfigureAwait (false);
 			return result.ParameterIndex;
 		}
 

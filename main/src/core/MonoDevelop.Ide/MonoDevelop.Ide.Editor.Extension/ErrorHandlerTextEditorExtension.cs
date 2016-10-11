@@ -34,6 +34,7 @@ using Microsoft.CodeAnalysis;
 using MonoDevelop.Core;
 using MonoDevelop.Core.Text;
 using MonoDevelop.Ide.TypeSystem;
+using MonoDevelop.Projects;
 
 namespace MonoDevelop.Ide.Editor.Extension
 {
@@ -139,9 +140,14 @@ namespace MonoDevelop.Ide.Editor.Extension
 			"CS1513" // } expected
 		};
 
+		static bool SkipError (DocumentContext ctx, Error error)
+		{
+			return (ctx.IsAdHocProject || !(ctx.Project is MonoDevelop.Projects.DotNetProject)) && !lexicalError.Contains (error.Id);
+		}
+
 		async Task UpdateErrorUndelines (DocumentContext ctx, ParsedDocument parsedDocument, CancellationToken token)
 		{
-			if (!DefaultSourceEditorOptions.Instance.UnderlineErrors || parsedDocument == null || isDisposed)
+			if (parsedDocument == null || isDisposed)
 				return;
 			try {
 				var errors = await parsedDocument.GetErrorsAsync(token).ConfigureAwait (false);
@@ -159,7 +165,7 @@ namespace MonoDevelop.Ide.Editor.Extension
 						// Else we underline the error
 						if (errors != null) {
 							foreach (var error in errors) {
-								if (ctx.IsAdHocProject && !lexicalError.Contains (error.Id))
+								if (SkipError (ctx, error))
 									continue;
 								UnderLineError (error);
 							}
@@ -212,7 +218,7 @@ namespace MonoDevelop.Ide.Editor.Extension
 				foreach (var error in await doc.GetErrorsAsync(token).ConfigureAwait (false)) {
 					if (token.IsCancellationRequested)
 						return;
-					if (ctx.IsAdHocProject && !lexicalError.Contains (error.Id))
+					if (SkipError (ctx, error))
 						continue;
 					int offset;
 					try {
@@ -233,7 +239,8 @@ namespace MonoDevelop.Ide.Editor.Extension
 				OnTasksUpdated (EventArgs.Empty);
 			});
 		}
-		#endregion
+
+	#endregion
 
 	}
 }

@@ -510,9 +510,12 @@ namespace MonoDevelop.Ide.Gui
 
 		public void CancelParseTimeout ()
 		{
-			if (parseTimeout != 0) {
-				GLib.Source.Remove (parseTimeout);
-				parseTimeout = 0;
+			lock (reparseTimeoutLock) {
+				var timeout = parseTimeout;
+				if (timeout != 0) {
+					GLib.Source.Remove (timeout);
+					parseTimeout = 0;
+				}
 			}
 		}
 		
@@ -666,7 +669,7 @@ namespace MonoDevelop.Ide.Gui
 		{
 			if (Editor != null) {
 				InitializeEditor ();
-				RunWhenLoaded (delegate { ListenToProjectLoad (Project); });
+				RunWhenRealized (delegate { ListenToProjectLoad (Project); });
 			}
 			
 			window.Document = this;
@@ -688,6 +691,16 @@ namespace MonoDevelop.Ide.Gui
 			e.RunWhenLoaded (action);
 		}
 
+		public void RunWhenRealized (System.Action action)
+		{
+			var e = Editor;
+			if (e == null) {
+				action ();
+				return;
+			}
+			e.RunWhenRealized (action);
+		}
+
 		public override void AttachToProject (Project project)
 		{
 			SetProject (project);
@@ -698,14 +711,12 @@ namespace MonoDevelop.Ide.Gui
 			if (Window == null || Window.ViewContent == null || Window.ViewContent.Project == project)
 				return;
 			UnloadAdhocProject ();
-			if (adhocProject == null) 
+			if (adhocProject == null)
 				UnsubscibeAnalysisdocument ();
-			if (Window.ViewContent.ProjectReloadCapability != ProjectReloadCapability.None) {
-				// Unsubscribe project events
-				if (Window.ViewContent.Project != null)
-					Window.ViewContent.Project.Modified -= HandleProjectModified;
-				Window.ViewContent.Project = project;
-			}
+			// Unsubscribe project events
+			if (Window.ViewContent.Project != null)
+				Window.ViewContent.Project.Modified -= HandleProjectModified;
+			Window.ViewContent.Project = project;
 			if (project != null)
 				project.Modified += HandleProjectModified;
 			InitializeExtensionChain ();
@@ -889,9 +900,11 @@ namespace MonoDevelop.Ide.Gui
 			lock (adhocProjectLock) {
 				if (adhocProject == null)
 					return;
-				TypeSystemService.Unload (adhocSolution);
-				adhocSolution.Dispose ();
-				adhocSolution = null;
+				if (adhocSolution != null) {
+					TypeSystemService.Unload (adhocSolution);
+					adhocSolution.Dispose ();
+					adhocSolution = null;
+				}
 				adhocProject = null;
 			}
 		}
@@ -904,17 +917,24 @@ namespace MonoDevelop.Ide.Gui
 			parseTokenSource = new CancellationTokenSource ();
 		}
 
+		object reparseTimeoutLock = new object ();
+
 		internal void StartReparseThread ()
 		{
-			string currentParseFile = GetCurrentParseFileName ();
-			if (string.IsNullOrEmpty (currentParseFile))
-				return;
-			CancelParseTimeout ();
+			RunWhenRealized (() => {
+				string currentParseFile = GetCurrentParseFileName ();
+				if (string.IsNullOrEmpty (currentParseFile))
+					return;
 
-			parseTimeout = GLib.Timeout.Add (ParseDelay, delegate {
-				StartReparseThreadDelayed (currentParseFile);
-				parseTimeout = 0;
-				return false;
+				lock (reparseTimeoutLock) {
+					CancelParseTimeout ();
+
+					parseTimeout = GLib.Timeout.Add (ParseDelay, delegate {
+						StartReparseThreadDelayed (currentParseFile);
+						parseTimeout = 0;
+						return false;
+					});
+				}
 			});
 		}
 

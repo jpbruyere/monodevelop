@@ -109,7 +109,7 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 		
 		MimeTypePanelData AddPanel (string mt)
 		{
-			var chain = new List<string> (DesktopService.GetMimeTypeInheritanceChain (mt).Where (x => mimeTypesWithPolicies.Contains (x)));
+			var chain = new List<string> (DesktopService.GetMimeTypeInheritanceChain (mt).Where (mimeTypesWithPolicies.Contains));
 			if (chain.Count == 0)
 				return null;
 			MimeTypePanelData data = new MimeTypePanelData ();
@@ -274,7 +274,8 @@ namespace MonoDevelop.Ide.Projects.OptionPanels
 			
 			store = new Gtk.ListStore (typeof(MimeTypePanelData), typeof(Xwt.Drawing.Image), typeof(string));
 			tree.Model = store;
-			
+			tree.SearchColumn = -1; // disable the interactive search
+
 			boxButtons.Visible = panel.DataObject is PolicySet;
 			Gtk.CellRendererText crt = new Gtk.CellRendererText ();
 			CellRendererImage crp = new CellRendererImage ();

@@ -74,7 +74,7 @@ namespace MonoDevelop.Ide.Gui
 			Pad pad = IdeApp.Workbench.GetPad<ErrorListPad> ();
 			ErrorListPad errorPad = (ErrorListPad) pad.Content;
 			AggregatedProgressMonitor mon = new AggregatedProgressMonitor (errorPad.GetBuildProgressMonitor ());
-			mon.AddFollowerMonitor (GetStatusProgressMonitor (statusText, Stock.StatusBuild, false, true, false, pad));
+			mon.AddFollowerMonitor (GetStatusProgressMonitor (statusText, Stock.StatusBuild, false, true, false, pad, true));
 			return mon;
 		}
 		
@@ -122,11 +122,14 @@ namespace MonoDevelop.Ide.Gui
 		}
 
 		/******************************/
-		
+		public ProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs, bool showTaskTitle, bool lockGui, Pad statusSourcePad, bool showCancelButton)
+		{
+			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad, showCancelButton);
+		}
 		
 		public ProgressMonitor GetStatusProgressMonitor (string title, IconId icon, bool showErrorDialogs, bool showTaskTitle = true, bool lockGui = false, Pad statusSourcePad = null)
 		{
-			return new StatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad);
+			return GetStatusProgressMonitor (title, icon, showErrorDialogs, showTaskTitle, lockGui, statusSourcePad, showCancelButton: false);
 		}
 		
 		public ProgressMonitor GetBackgroundProgressMonitor (string title, IconId icon)
@@ -225,10 +228,11 @@ namespace MonoDevelop.Ide.Gui
 			
 			if (instanceCount > 0) {
 				// Additional output pads will be destroyed when hidden
-				pad.Window.PadHidden += delegate {
+				pad.Window.PadHidden += (s,a) => {
 					// Workaround for crash reported in bug #18096. Look like MS.NET can't access private fields
 					// when the delegate is invoked through the remoting chain.
-					DestroyPad (pad);
+					if (!a.SwitchingLayout)
+						DestroyPad (pad);
 				};
 			}
 			

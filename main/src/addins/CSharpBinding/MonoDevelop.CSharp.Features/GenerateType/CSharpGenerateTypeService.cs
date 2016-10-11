@@ -65,6 +65,8 @@ namespace ICSharpCode.NRefactory6.CSharp.GenerateType
 				var typeArgumentList = (TypeArgumentListSyntax)expression.Parent;
 				var symbolInfo = semanticModel.GetSymbolInfo(typeArgumentList.Parent, cancellationToken);
 				var symbol = symbolInfo.GetAnySymbol();
+				if (symbol == null)
+					return false;
 				if (symbol.IsConstructor())
 				{
 					symbol = symbol.ContainingType;
@@ -918,9 +920,8 @@ namespace ICSharpCode.NRefactory6.CSharp.GenerateType
 		internal override IMethodSymbol GetDelegatingConstructor(ObjectCreationExpressionSyntax objectCreation, INamedTypeSymbol namedType, SemanticModel model, ISet<IMethodSymbol> candidates, CancellationToken cancellationToken)
 		{
 			var oldNode = objectCreation
-				.AncestorsAndSelf(ascendOutOfTrivia: false)
-				.Where(node => SpeculationAnalyzer.CanSpeculateOnNode(node))
-				.LastOrDefault();
+				.AncestorsAndSelf (ascendOutOfTrivia: false)
+				.LastOrDefault (SpeculationAnalyzer.CanSpeculateOnNode);
 
 			var typeNameToReplace = objectCreation.Type;
 			var newTypeName = namedType.GenerateTypeSyntax();

@@ -228,8 +228,12 @@ namespace MonoDevelop.CSharp.ClassOutline
 				Editor.CaretOffset = ((SyntaxTrivia)o).SpanStart;
 			}
 
-			if (focusEditor)
-				Editor.GrabFocus ();
+			if (focusEditor) {
+				GLib.Timeout.Add (10, delegate {
+					Editor.GrabFocus ();
+					return false;
+				});
+			}
 		}
 
 		static void OutlineTreeIconFunc (TreeViewColumn column, CellRenderer cell, TreeModel model, TreeIter iter)
@@ -261,14 +265,6 @@ namespace MonoDevelop.CSharp.ClassOutline
 				return;
 			var w = (ScrolledWindow)outlineTreeView.Parent;
 			w.Destroy ();
-			if (outlineTreeModelSort != null) {
-				outlineTreeModelSort.Dispose ();
-				outlineTreeModelSort = null;
-			}
-			if (outlineTreeStore != null) {
-				outlineTreeStore.Dispose ();
-				outlineTreeStore = null;
-			}
 			outlineTreeView = null;
 			settings = null;
 			foreach (var tw in toolbarWidgets)
@@ -506,6 +502,7 @@ namespace MonoDevelop.CSharp.ClassOutline
 			} else {
 				outlineTreeView.Model = outlineTreeStore;
 			}
+			outlineTreeView.SearchColumn = -1; // disable the interactive search
 
 			// Because sorting the tree by setting the sort function also collapses the tree view we expand
 			// the whole tree.

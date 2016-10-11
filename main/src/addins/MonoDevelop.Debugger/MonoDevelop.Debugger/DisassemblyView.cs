@@ -75,7 +75,7 @@ namespace MonoDevelop.Debugger
 
 			editor.Options = DefaultSourceEditorOptions.PlainEditor;
 			
-			sw.Add (editor);
+			sw.AddWithViewport (editor);
 			sw.HscrollbarPolicy = Gtk.PolicyType.Automatic;
 			sw.VscrollbarPolicy = Gtk.PolicyType.Automatic;
 			sw.ShowAll ();
@@ -102,7 +102,7 @@ namespace MonoDevelop.Debugger
 
 			var hbox = new HBox ();
 			hbox.Spacing = 8;
-			var label = new Label (string.Format ("{0} not found. Find source file at alternative location.", Path.GetFileName (sf.SourceLocation.FileName)));
+			var label = new Label (GettextCatalog.GetString ("{0} not found. Find source file at alternative location.", Path.GetFileName (sf.SourceLocation.FileName)));
 			hbox.TooltipText = sf.SourceLocation.FileName;
 
 			var color = (HslColor)editor.Options.GetColorStyle ().NotificationText.Foreground;
@@ -138,13 +138,13 @@ namespace MonoDevelop.Debugger
 								this.WorkbenchWindow.CloseWindow (false);
 							}
 						} else {
-							MessageService.ShowWarning ("File checksum doesn't match.");
+							MessageService.ShowWarning (GettextCatalog.GetString("File checksum doesn't match."));
 						}
 					} else {
-						MessageService.ShowWarning ("File not found.");
+						MessageService.ShowWarning (GettextCatalog.GetString ("File not found."));
 					}
 				} catch (Exception) {
-					MessageService.ShowWarning ("Error opening file");
+					MessageService.ShowWarning (GettextCatalog.GetString ("Error opening file."));
 				}
 			};
 		}

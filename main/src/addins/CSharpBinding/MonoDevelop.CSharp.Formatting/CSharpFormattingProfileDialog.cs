@@ -133,7 +133,7 @@ namespace MonoDevelop.CSharp.Formatting
 			texteditor.Options = DefaultSourceEditorOptions.PlainEditor;
 			texteditor.IsReadOnly = true;
 			texteditor.MimeType = CSharpFormatter.MimeType;
-			scrolledwindow.Child = texteditor;
+			scrolledwindow.AddWithViewport (texteditor);
 			ShowAll ();
 			
 			#region Indent options
@@ -152,6 +152,7 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 			 
 			treeviewIndentOptions.Model = indentationOptions;
+			treeviewIndentOptions.SearchColumn = -1; // disable the interactive search
 			treeviewIndentOptions.HeadersVisible = false;
 			treeviewIndentOptions.Selection.Changed += TreeSelectionChanged;
 			treeviewIndentOptions.AppendColumn (column);
@@ -181,11 +182,56 @@ namespace MonoDevelop.CSharp.Formatting
 			treeviewIndentOptions.AppendColumn (column);
 
 
-			AddOption (indentationOptions, "IndentBlock", GettextCatalog.GetString ("Indent block contents"), "namespace Test { class AClass { void Method () { int x; int y; } } }");
-			AddOption (indentationOptions, "IndentBraces", GettextCatalog.GetString ("Indent open and close braces"), "class AClass { int aField; void AMethod () {}}");
-			AddOption (indentationOptions, "IndentSwitchSection", GettextCatalog.GetString ("Indent switch sections"), "class AClass { void Method (int x) { switch (x) { case 1: break; } } }");
-			AddOption (indentationOptions, "IndentSwitchCaseSection", GettextCatalog.GetString ("Indent case sections"), "class AClass { void Method (int x) { switch (x) { case 1: break; } } }");
-			AddOption (indentationOptions, "LabelPositioning", GettextCatalog.GetString ("Label indentation"), "enum AEnum { A, B, C }");
+			AddOption (indentationOptions, "IndentBlock", GettextCatalog.GetString ("Indent block contents"), @"namespace Test
+{
+	class AClass
+	{
+		void Method ()
+		{
+			int x;
+			int y;
+		}
+	}
+}");
+			AddOption (indentationOptions, "IndentBraces", GettextCatalog.GetString ("Indent open and close braces"), @"class AClass
+{
+	int aField;
+
+	void AMethod()
+	{
+	}
+}");
+			AddOption (indentationOptions, "IndentSwitchSection", GettextCatalog.GetString ("Indent switch sections"), @"class AClass
+{
+	void Method(int x)
+	{
+		switch (x)
+		{
+			case 1:
+			break;
+		}
+	}
+}");
+			AddOption (indentationOptions, "IndentSwitchCaseSection", GettextCatalog.GetString ("Indent case sections"), @"class AClass
+{
+	void Method(int x)
+	{
+		switch (x)
+		{
+			case 1:
+			break;
+		}
+	}
+}");
+			AddOption (indentationOptions, "LabelPositioning", GettextCatalog.GetString ("Label indentation"), @"class Test
+{
+	void Method()
+	{
+	label:
+		Console.WriteLine (""Hello World"");
+	}
+
+}");
 			treeviewIndentOptions.ExpandAll ();
 			#endregion
 			
@@ -204,6 +250,7 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 			
 			treeviewNewLines.Model = newLineOptions;
+			treeviewNewLines.SearchColumn = -1; // disable the interactive search
 			treeviewNewLines.HeadersVisible = false;
 			treeviewNewLines.Selection.Changed += TreeSelectionChanged;
 			treeviewNewLines.AppendColumn (column);
@@ -357,6 +404,7 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 
 			treeviewSpacing.Model = spacingOptions;
+			treeviewSpacing.SearchColumn = -1; // disable the interactive search
 			treeviewSpacing.HeadersVisible = false;
 			treeviewSpacing.Selection.Changed += TreeSelectionChanged;
 			treeviewSpacing.AppendColumn (column);
@@ -522,6 +570,7 @@ namespace MonoDevelop.CSharp.Formatting
 
 
 			treeviewStyle.Model = styleOptions;
+			treeviewStyle.SearchColumn = -1; // disable the interactive search
 			treeviewStyle.HeadersVisible = false;
 			treeviewStyle.Selection.Changed += TreeSelectionChanged;
 			treeviewStyle.AppendColumn (column);
@@ -572,6 +621,7 @@ namespace MonoDevelop.CSharp.Formatting
 			column.SetAttributes (cellRendererText, "text", 1);
 
 			treeviewWrapping.Model = wrappingOptions;
+			treeviewWrapping.SearchColumn = -1; // disable the interactive search
 			treeviewWrapping.HeadersVisible = false;
 			treeviewWrapping.Selection.Changed += TreeSelectionChanged;
 			treeviewWrapping.AppendColumn (column);
@@ -696,7 +746,7 @@ namespace MonoDevelop.CSharp.Formatting
 			return info.GetValue (profile, null);
 		}
 		
-		static void RenderIcon (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void RenderIcon (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			var pixbufCellRenderer = (CellRendererImage)cell;
 			if (model.IterHasChild (iter)) {
@@ -706,7 +756,7 @@ namespace MonoDevelop.CSharp.Formatting
 			}
 		}
 		
-		void ComboboxDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void ComboboxDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			var cellRenderer = (CellRendererCombo)cell;
 			var info = GetProperty (model, iter);
@@ -714,17 +764,21 @@ namespace MonoDevelop.CSharp.Formatting
 				cellRenderer.Text = "<invalid>";
 				return;
 			}
+
+			var profile = ((CSharpFormattingProfileDialog)col.TreeView.Toplevel).profile;
 			object value = info.GetValue (profile, null);
 			
 			cellRenderer.Text = value is Enum ? TranslateValue (value) : value.ToString ();
 		}
 		
-		void ToggleDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter) 
+		static void ToggleDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			var cellRenderer = (CellRendererToggle)cell;
 			var info = GetProperty (model, iter);
 			if (info == null || info.PropertyType != typeof(bool)) 
 				return;
+
+			var profile = ((CSharpFormattingProfileDialog)col.TreeView.Toplevel).profile;
 			bool value = (bool)info.GetValue (profile, null);
 			cellRenderer.Active = value;
 		}

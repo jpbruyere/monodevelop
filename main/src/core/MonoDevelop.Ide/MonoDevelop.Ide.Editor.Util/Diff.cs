@@ -102,7 +102,7 @@ namespace MonoDevelop.Ide.Editor.Util
 	/// <summary>
 	/// A DiffHunk represents a single change in a diff between two files.
 	/// </summary>
-	public struct DiffHunk
+	public struct DiffHunk : IEquatable<DiffHunk>
 	{
 		public static readonly DiffHunk Empty = new DiffHunk (0, 0, 0, 0);
 
@@ -174,6 +174,11 @@ namespace MonoDevelop.Ide.Editor.Util
 			if (!(obj is DiffHunk))
 				return false;
 			return ((DiffHunk)obj) == this;
+		}
+
+		public bool Equals (DiffHunk other)
+		{
+			return this == other;
 		}
 		
 		public override int GetHashCode ()
@@ -249,11 +254,8 @@ namespace MonoDevelop.Ide.Editor.Util
 		{
 			int lineA = 0;
 			int lineB = 0;
-			while (lineA < baseData.Length || lineB < changedData
-		.Length) {
-				if (lineA < baseData.Length && !baseData.Modified[lineA] && lineB < changedData
-		.Length && !changedData
-		.Modified[lineB]) {
+			while (lineA < baseData.Length || lineB < changedData.Length) {
+				if (lineA < baseData.Length && !baseData.Modified[lineA] && lineB < changedData.Length && !changedData.Modified[lineB]) {
 					// equal lines
 					lineA++;
 					lineB++;
@@ -263,14 +265,11 @@ namespace MonoDevelop.Ide.Editor.Util
 					int startA = lineA;
 					int startB = lineB;
 
-					while (lineA < baseData.Length && (lineB >= changedData
-		.Length || baseData.Modified[lineA]))
+					while (lineA < baseData.Length && (lineB >= changedData.Length || baseData.Modified[lineA]))
 						// while (LineA < DataA.Length && DataA.Modified[LineA])
 						lineA++;
 
-					while (lineB < changedData
-		.Length && (lineA >= baseData.Length || changedData
-		.Modified[lineB]))
+					while (lineB < changedData.Length && (lineA >= baseData.Length || changedData.Modified[lineB]))
 						// while (LineB < DataB.Length && DataB.Modified[LineB])
 						lineB++;
 

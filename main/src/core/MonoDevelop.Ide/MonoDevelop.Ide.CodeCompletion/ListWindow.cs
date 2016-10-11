@@ -334,8 +334,6 @@ namespace MonoDevelop.Ide.CodeCompletion
 					UpdateWordSelection ();
 					return KeyActions.Process;
 				}
-				if (keyChar == '.' && !list.AutoCompleteEmptyMatch && PartialWord == ".")
-					list.AutoSelect = list.AutoCompleteEmptyMatch = true;
 				lastCommitCharEndoffset = CompletionWidget.CaretOffset - 1;
 
 				if (list.SelectionEnabled && CompletionCharacters.CompleteOn (keyChar)) {
@@ -408,6 +406,8 @@ namespace MonoDevelop.Ide.CodeCompletion
 				goto case SpecialKey.Return;
 
 			case SpecialKey.Return:
+				if (completionDataList == null || completionDataList.Count == 0)
+					return KeyActions.CloseWindow;
 				lastCommitCharEndoffset = CompletionWidget.CaretOffset;
 				WasShiftPressed = (descriptor.ModifierKeys & ModifierKeys.Shift) == ModifierKeys.Shift;
 				return KeyActions.Complete | KeyActions.Ignore | KeyActions.CloseWindow;

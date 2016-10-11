@@ -279,15 +279,20 @@ namespace MonoDevelop.CSharp.Parser
 		}
 
 		IReadOnlyList<FoldingRegion> foldings;
-		object foldingLock = new object ();
+		SemaphoreSlim foldingsSemaphore = new SemaphoreSlim (1, 1);
 
 		public override Task<IReadOnlyList<FoldingRegion>> GetFoldingsAsync (CancellationToken cancellationToken = default(CancellationToken))
 		{
 			if (foldings == null) {
-				return Task.Run (delegate {
-					lock (foldingLock) {
+				return Task.Run (async delegate {
+					bool locked = false;
+					try {
+						locked = await foldingsSemaphore.WaitAsync (Timeout.Infinite, cancellationToken);
 						if (foldings == null)
-							foldings = GenerateFoldings (cancellationToken).ToList ();
+							foldings = (await GenerateFoldings (cancellationToken)).ToList ();
+					} finally {
+						if (locked)
+							foldingsSemaphore.Release ();
 					}
 					return foldings;
 				});
@@ -296,9 +301,14 @@ namespace MonoDevelop.CSharp.Parser
 			return Task.FromResult (foldings);
 		}
 
-		IEnumerable<FoldingRegion> GenerateFoldings (CancellationToken cancellationToken)
+		async Task<IEnumerable<FoldingRegion>> GenerateFoldings (CancellationToken cancellationToken)
 		{
-			foreach (var fold in GetCommentsAsync().Result.ToFolds ())
+			return GenerateFoldingsInternal (await GetCommentsAsync (cancellationToken), cancellationToken);
+		}
+
+		IEnumerable<FoldingRegion> GenerateFoldingsInternal (IReadOnlyList<Comment> comments, CancellationToken cancellationToken)
+		{
+			foreach (var fold in comments.ToFolds ())
 				yield return fold;
 
 			var visitor = new FoldingVisitor (cancellationToken);
@@ -426,7 +436,7 @@ namespace MonoDevelop.CSharp.Parser
 
 		static readonly IReadOnlyList<Error> emptyErrors = new Error[0];
 		IReadOnlyList<Error> errors;
-		object errorLock = new object ();
+		SemaphoreSlim errorLock = new SemaphoreSlim (1, 1);
 
 		public override Task<IReadOnlyList<Error>> GetErrorsAsync (CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -435,8 +445,9 @@ namespace MonoDevelop.CSharp.Parser
 				return Task.FromResult (emptyErrors);
 			
 			if (errors == null) {
-				return Task.Run (delegate {
-					lock (errorLock) {
+				return Task.Run (async delegate {
+					bool locked = await errorLock.WaitAsync (Timeout.Infinite, cancellationToken);
+					try {
 						if (errors == null) {
 							try {
 								errors = model
@@ -451,8 +462,10 @@ namespace MonoDevelop.CSharp.Parser
 								errors = emptyErrors;
 							}
 						}
-					}
-					return errors;
+						return errors;
+					} finally {
+						if (locked)
+							errorLock.Release ();					}
 				});
 			}
 			return Task.FromResult (errors);

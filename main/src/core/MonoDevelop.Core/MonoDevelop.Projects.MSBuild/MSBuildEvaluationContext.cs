@@ -38,28 +38,39 @@ using Microsoft.Build.Utilities;
 using MonoDevelop.Projects.MSBuild.Conditions;
 using System.Globalization;
 using Microsoft.Build.Evaluation;
+using System.Web.UI.WebControls;
 
 namespace MonoDevelop.Projects.MSBuild
 {
 	class MSBuildEvaluationContext: IExpressionContext
 	{
-		Dictionary<string,string> properties = new Dictionary<string, string> ();
+		Dictionary<string,string> properties = new Dictionary<string, string> (StringComparer.OrdinalIgnoreCase);
+		static Dictionary<string, string> envVars = new Dictionary<string, string> ();
+		HashSet<string> propertiesWithTransforms = new HashSet<string> ();
+		List<string> propertiesWithTransformsSorted = new List<string> ();
+		public Dictionary<string, bool> ExistsEvaluationCache { get; } = new Dictionary<string, bool> ();
 
 		bool allResolved;
 		MSBuildProject project;
 		MSBuildEvaluationContext parentContext;
+		IMSBuildPropertyGroupEvaluated itemMetadata;
+		string directoryName;
 
 		string itemFile;
 		string recursiveDir;
 
 		public MSBuildEvaluationContext ()
 		{
+			propertiesWithTransforms = new HashSet<string> ();
+			propertiesWithTransformsSorted = new List<string> ();
 		}
 
 		public MSBuildEvaluationContext (MSBuildEvaluationContext parentContext)
 		{
 			this.parentContext = parentContext;
 			this.project = parentContext.project;
+			this.propertiesWithTransforms = parentContext.propertiesWithTransforms;
+			this.propertiesWithTransformsSorted = parentContext.propertiesWithTransformsSorted;
 		}
 
 		internal void InitEvaluation (MSBuildProject project)
@@ -161,10 +172,17 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 		}
 
+		public MSBuildProject Project {
+			get { return project; }
+		}
+
 		static string extensionsPath;
 
 		internal static string DefaultExtensionsPath {
 			get {
+				if (extensionsPath == null)
+					extensionsPath = Environment.GetEnvironmentVariable ("MSBuildExtensionsPath");
+
 				if (extensionsPath == null) {
 					// NOTE: code from mcs/tools/gacutil/driver.cs
 					PropertyInfo gac = typeof (System.Environment).GetProperty (
@@ -195,16 +213,18 @@ namespace MonoDevelop.Projects.MSBuild
 			yield return DefaultExtensionsPath;
 		}
 
-		internal void SetItemContext (string itemFile, string recursiveDir)
+		internal void SetItemContext (string itemFile, string recursiveDir, IMSBuildPropertyGroupEvaluated metadata = null)
 		{
 			this.itemFile = itemFile;
 			this.recursiveDir = recursiveDir;
+			this.itemMetadata = metadata;
 		}
 
 		internal void ClearItemContext ()
 		{
 			this.itemFile = null;
 			this.recursiveDir = null;
+			this.itemMetadata = null;
 		}
 
 		string GetPropertyValue (string name)
@@ -214,8 +234,11 @@ namespace MonoDevelop.Projects.MSBuild
 				return val;
 			if (parentContext != null)
 				return parentContext.GetPropertyValue (name);
-			else
-				return Environment.GetEnvironmentVariable (name);
+
+			if (envVars.TryGetValue (name, out val))
+				return val;
+
+			return envVars[name] = Environment.GetEnvironmentVariable (name);
 		}
 
 		public string GetMetadataValue (string name)
@@ -223,42 +246,44 @@ namespace MonoDevelop.Projects.MSBuild
 			if (itemFile == null)
 				return "";
 
-			switch (name.ToLower ()) {
-			case "fullpath": return ToMSBuildPath (Path.GetFullPath (itemFile));
-			case "rootdir": return ToMSBuildDir (Path.GetPathRoot (itemFile));
-			case "filename": return Path.GetFileNameWithoutExtension (itemFile);
-			case "extension": return Path.GetExtension (itemFile);
-			case "relativedir": return ToMSBuildDir (new FilePath (itemFile).ToRelative (project.BaseDirectory).ParentDirectory);
-			case "directory": {
-					var root = Path.GetPathRoot (itemFile);
-					if (!string.IsNullOrEmpty (root))
-						return ToMSBuildDir (Path.GetFullPath (itemFile).Substring (root.Length));
-					return ToMSBuildDir (Path.GetFullPath (itemFile));
-				}
-			case "recursivedir": return recursiveDir != null ? ToMSBuildDir (recursiveDir) : "";
-			case "identity": return ToMSBuildPath (itemFile);
-			case "modifiedtime": {
-					try {
+			try {
+				switch (name.ToLower ()) {
+				case "fullpath": return ToMSBuildPath (Path.GetFullPath (itemFile));
+				case "rootdir": return ToMSBuildDir (Path.GetPathRoot (itemFile));
+				case "filename": return Path.GetFileNameWithoutExtension (itemFile);
+				case "extension": return Path.GetExtension (itemFile);
+				case "relativedir": return ToMSBuildDir (new FilePath (itemFile).ToRelative (project.BaseDirectory).ParentDirectory);
+				case "directory": {
+						var root = Path.GetPathRoot (itemFile);
+						if (!string.IsNullOrEmpty (root))
+							return ToMSBuildDir (Path.GetFullPath (itemFile).Substring (root.Length));
+						return ToMSBuildDir (Path.GetFullPath (itemFile));
+					}
+				case "recursivedir": return recursiveDir != null ? ToMSBuildDir (recursiveDir) : "";
+				case "identity": return ToMSBuildPath (itemFile);
+				case "modifiedtime": {
+						if (!File.Exists (itemFile))
+							return "";
 						return File.GetLastWriteTime (itemFile).ToString ("yyyy-MM-dd hh:mm:ss");
-					} catch {
-						return "";
 					}
-				}
-			case "createdtime": {
-				try {
-					return File.GetCreationTime (itemFile).ToString ("yyyy-MM-dd hh:mm:ss");
-				} catch {
-					return "";
-				}
-			}
-			case "accessedtime": {
-					try {
+				case "createdtime": {
+						if (!File.Exists (itemFile))
+							return "";
+						return File.GetCreationTime (itemFile).ToString ("yyyy-MM-dd hh:mm:ss");
+					}
+				case "accessedtime": {
+						if (!File.Exists (itemFile))
+							return "";
 						return File.GetLastAccessTime (itemFile).ToString ("yyyy-MM-dd hh:mm:ss");
-					} catch {
-						return "";
 					}
 				}
+				if (itemMetadata != null)
+					return itemMetadata.GetValue (name, "");
+			} catch (Exception ex) {
+				LoggingService.LogError ("Failure in MSBuild file", ex);
+				return "";
 			}
+
 			return "";
 		}
 
@@ -288,6 +313,18 @@ namespace MonoDevelop.Projects.MSBuild
 			properties.Remove (name);
 			if (parentContext != null)
 				parentContext.ClearPropertyValue (name);
+		}
+
+		public void SetPropertyNeedsTransformEvaluation (string name)
+		{
+			if (!propertiesWithTransforms.Add (name))
+				propertiesWithTransformsSorted.Remove (name);
+			propertiesWithTransformsSorted.Add (name);
+		}
+
+		public IEnumerable<String> GetPropertiesNeedingTransformEvaluation ()
+		{
+			return propertiesWithTransformsSorted;
 		}
 
 		XmlNode EvaluateNode (XmlNode source)
@@ -323,37 +360,79 @@ namespace MonoDevelop.Projects.MSBuild
 
 		readonly static char[] tagStart = new [] {'$','%','@'};
 
-		public string Evaluate (string str)
+		Queue<StringBuilder> evaluationSbs = new Queue<StringBuilder> ();
+		StringBuilder GetEvaluationSb ()
 		{
+			if (evaluationSbs.Count == 0)
+				return new StringBuilder ();
+			return evaluationSbs.Dequeue ().Clear ();
+		}
+
+		string Evaluate (string str, StringBuilder sb, List<MSBuildItemEvaluated> evaluatedItemsCollection, out bool needsItemEvaluation)
+		{
+			needsItemEvaluation = false;
+
 			if (str == null)
 				return null;
-			
 			int i = FindNextTag (str, 0);
 			if (i == -1)
 				return str;
 
 			int last = 0;
 
-			StringBuilder sb = new StringBuilder ();
-			do {
-				sb.Append (str, last, i - last);
-				int j = i;
-				object val;
-				if (!EvaluateReference (str, ref j, out val))
-					allResolved = false;
-				sb.Append (ValueToString (val));
-				last = j;
+			if (sb == null)
+				sb = GetEvaluationSb ();
 
-				i = FindNextTag (str, last);
+			try {
+				do {
+					sb.Append (str, last, i - last);
+					int j = i;
+					object val;
+					bool nie;
+					if (!EvaluateReference (str, evaluatedItemsCollection, ref j, out val, out nie))
+						allResolved = false;
+					needsItemEvaluation |= nie;
+					sb.Append (ValueToString (val));
+					last = j;
+
+					i = FindNextTag (str, last);
+				}
+				while (i != -1);
+
+				sb.Append (str, last, str.Length - last);
+				return sb.ToString ();
+			} finally {
+				evaluationSbs.Enqueue (sb);
 			}
-			while (i != -1);
-
-			sb.Append (str, last, str.Length - last);
-			return sb.ToString ();
 		}
 
-		bool EvaluateReference (string str, ref int i, out object val)
+		public string Evaluate (string str, StringBuilder sb)
 		{
+			bool needsItemEvaluation;
+			return Evaluate (str, sb, null, out needsItemEvaluation);
+		}
+
+		public string EvaluateWithItems (string str, List<MSBuildItemEvaluated> evaluatedItemsCollection)
+		{
+			bool needsItemEvaluation;
+			return Evaluate (str, null, evaluatedItemsCollection, out needsItemEvaluation);
+		}
+
+		public string Evaluate (string str)
+		{
+			bool needsItemEvaluation;
+			return Evaluate (str, null, null, out needsItemEvaluation);
+		}
+
+		public string Evaluate (string str, out bool needsItemEvaluation)
+		{
+			return Evaluate (str, null, null, out needsItemEvaluation);
+		}
+
+		bool EvaluateReference (string str, List<MSBuildItemEvaluated> evaluatedItemsCollection, ref int i, out object val, out bool needsItemEvaluation)
+		{
+			needsItemEvaluation = false;
+
 			val = null;
 			var tag = str[i];
 			int start = i;
@@ -372,9 +451,21 @@ namespace MonoDevelop.Projects.MSBuild
 			bool res = false;
 			if (prop.Length > 0) {
 				switch (tag) {
-					case '$': res = EvaluateProperty (prop, out val); break;
-					case '%': res = EvaluateMetadata (prop, out val); break;
-					case '@': res = EvaluateList (prop, out val); break;
+					case '$': {
+						bool nie;
+						res = EvaluateProperty (prop, evaluatedItemsCollection != null, out val, out nie);
+						needsItemEvaluation |= nie;
+						break;
+					}
+				case '%': res = EvaluateMetadata (prop, out val); break;
+				case '@':
+					if (evaluatedItemsCollection != null)
+						res = EvaluateList (prop, evaluatedItemsCollection, out val);
+					else {
+						res = false;
+						needsItemEvaluation = true;
+					}
+					break;
 				}
 			}
 			if (!res)
@@ -387,8 +478,9 @@ namespace MonoDevelop.Projects.MSBuild
 			return ob != null ? Convert.ToString (ob, CultureInfo.InvariantCulture) : string.Empty;
 		}
 
-		bool EvaluateProperty (string prop, out object val)
+		bool EvaluateProperty (string prop, bool ignorePropsWithTransforms, out object val, out bool needsItemEvaluation)
 		{
+			needsItemEvaluation = false;
 			val = null;
 			if (prop [0] == '[') {
 				int i = prop.IndexOf (']');
@@ -405,6 +497,7 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 			int n = prop.IndexOf ('.');
 			if (n == -1) {
+				needsItemEvaluation |= (!ignorePropsWithTransforms && propertiesWithTransforms.Contains (prop));
 				val = GetPropertyValue (prop) ?? string.Empty;
 				return true;
 			} else {
@@ -414,7 +507,7 @@ namespace MonoDevelop.Projects.MSBuild
 			}
 		}
 
-		bool EvaluateMember (Type type, object instance, string str, int i, out object val)
+		internal bool EvaluateMember (Type type, object instance, string str, int i, out object val)
 		{
 			val = null;
 
@@ -428,7 +521,7 @@ namespace MonoDevelop.Projects.MSBuild
 				return false;
 			
 			var member = ResolveMember (type, memberName, instance == null);
-			if (member.Length == 0)
+			if (member == null || member.Length == 0)
 				return false;
 
 			if (j < str.Length && str[j] == '(') {
@@ -438,61 +531,12 @@ namespace MonoDevelop.Projects.MSBuild
 				if (!EvaluateParameters (str, ref j, out parameterValues))
 					return false;
 
-				// Find a method with a matching number of parameters
-				var method = FindBestOverload (member.OfType<MethodInfo> (), parameterValues);
-				if (method == null)
+				if (!EvaluateMethod (str, member, instance, parameterValues, out val))
 					return false;
 				
-				try {
-					// Convert the given parameters to the types specified in the method signature
-					var methodParams = method.GetParameters ();
+				// Skip the closing parens
+				j++;
 
-					var convertedArgs = (methodParams.Length == parameterValues.Length) ? parameterValues : new object [methodParams.Length];
-
-					int numArgs = methodParams.Length;
-					Type paramsArgType = null;
-					if (methodParams.Length > 0 && methodParams [methodParams.Length - 1].ParameterType.IsArray && methodParams [methodParams.Length - 1].IsDefined (typeof (ParamArrayAttribute))) {
-						paramsArgType = methodParams [methodParams.Length - 1].ParameterType.GetElementType ();
-						numArgs--;
-					}
-
-					int n;
-					for (n = 0; n < numArgs; n++)
-						convertedArgs [n] = ConvertArg (method, n, parameterValues [n], methodParams [n].ParameterType);
-
-					if (methodParams.Length == parameterValues.Length && paramsArgType != null) {
-						// Invoking an method with a params argument, but the number of arguments provided is the same as the
-						// number of arguments of the method, so the last argument can be either one of the values of the
-						// params array, or it can be the whole params array. 
-						try {
-							var last = convertedArgs.Length - 1;
-							convertedArgs [last] = ConvertArg (method, last, parameterValues [last], methodParams [last].ParameterType);
-
-							// Conversion worked. Ignore the params argument.
-							paramsArgType = null;
-						} catch (InvalidCastException) {
-							// Conversion of the last argument failed, so it probably needs to be handled as a single value
-							// for the params argument.
-						}
-					}
-
-					if (paramsArgType != null) {  
-						var argsArray = new object [parameterValues.Length - numArgs];
-						for (int m = 0; m < argsArray.Length; m++)
-							argsArray [m] = ConvertArg (method, n, parameterValues [n++], paramsArgType);
-						convertedArgs [convertedArgs.Length - 1] = argsArray;
-					}
-
-					// Invoke the method
-					val = method.Invoke (instance, convertedArgs);
-
-					// Skip the closing parens
-					j++;
-				}
-				catch (Exception ex) {
-					LoggingService.LogError ("MSBuild property evaluation failed: " + str, ex);
-					return false;
-				}
 			} else {
 				// It has to be a property or field
 				try {
@@ -516,7 +560,74 @@ namespace MonoDevelop.Projects.MSBuild
 			return true;
 		}
 
-		bool EvaluateParameters (string str, ref int i, out object[] parameters)
+		internal bool EvaluateMember (string str, Type type, string memberName, object instance, object [] parameterValues, out object val)
+		{
+			val = null;
+			var member = ResolveMember (type, memberName, instance == null);
+			if (member == null || member.Length == 0)
+				return false;
+			return EvaluateMethod (str, member, instance, parameterValues, out val);
+		}
+
+		bool EvaluateMethod (string str, MemberInfo[] member, object instance, object [] parameterValues, out object val)
+		{
+			val = null;
+
+			// Find a method with a matching number of parameters
+			var method = FindBestOverload (member.OfType<MethodBase> (), parameterValues);
+			if (method == null)
+				return false;
+
+			try {
+				// Convert the given parameters to the types specified in the method signature
+				var methodParams = method.GetParameters ();
+
+				var convertedArgs = (methodParams.Length == parameterValues.Length) ? parameterValues : new object [methodParams.Length];
+
+				int numArgs = methodParams.Length;
+				Type paramsArgType = null;
+				if (methodParams.Length > 0 && methodParams [methodParams.Length - 1].ParameterType.IsArray && methodParams [methodParams.Length - 1].IsDefined (typeof (ParamArrayAttribute))) {
+					paramsArgType = methodParams [methodParams.Length - 1].ParameterType.GetElementType ();
+					numArgs--;
+				}
+
+				int n;
+				for (n = 0; n < numArgs; n++)
+					convertedArgs [n] = ConvertArg (method, n, parameterValues [n], methodParams [n].ParameterType);
+
+				if (methodParams.Length == parameterValues.Length && paramsArgType != null) {
+					// Invoking an method with a params argument, but the number of arguments provided is the same as the
+					// number of arguments of the method, so the last argument can be either one of the values of the
+					// params array, or it can be the whole params array. 
+					try {
+						var last = convertedArgs.Length - 1;
+						convertedArgs [last] = ConvertArg (method, last, parameterValues [last], methodParams [last].ParameterType);
+
+						// Conversion worked. Ignore the params argument.
+						paramsArgType = null;
+					} catch (InvalidCastException) {
+						// Conversion of the last argument failed, so it probably needs to be handled as a single value
+						// for the params argument.
+					}
+				}
+
+				if (paramsArgType != null) {
+					var argsArray = new object [parameterValues.Length - numArgs];
+					for (int m = 0; m < argsArray.Length; m++)
+						argsArray [m] = ConvertArg (method, n, parameterValues [n++], paramsArgType);
+					convertedArgs [convertedArgs.Length - 1] = argsArray;
+				}
+
+				// Invoke the method
+				val = method.Invoke (instance, convertedArgs);
+			} catch (Exception ex) {
+				LoggingService.LogError ("MSBuild property evaluation failed: " + str, ex);
+				return false;
+			}
+			return true;
+		}
+
+		internal bool EvaluateParameters (string str, ref int i, out object[] parameters)
 		{
 			parameters = null;
 			var list = new List<object> ();
@@ -552,11 +663,11 @@ namespace MonoDevelop.Projects.MSBuild
 			return false;
 		}
 
-		MethodInfo FindBestOverload (IEnumerable<MethodInfo> methods, object [] args)
+		MethodBase FindBestOverload (IEnumerable<MethodBase> methods, object [] args)
 		{
-			MethodInfo methodWithParams = null;
+			MethodBase methodWithParams = null;
 
-			foreach (var m in methods.OfType<MethodInfo> ()) {
+			foreach (var m in methods) {
 				var argInfo = m.GetParameters ();
 
 				// Exclude methods which take a complex object as argument
@@ -569,8 +680,16 @@ namespace MonoDevelop.Projects.MSBuild
 				}
 				if (args.Length != argInfo.Length)
 					continue;
-				
-				return m;
+
+				bool isValid = true;
+				for (int n = 0; n < args.Length; n++) {
+					if (!CanConvertArg (m, n, args [n], argInfo [n].ParameterType)) {
+						isValid = false;
+						break;
+					}
+				}
+				if (isValid)
+					return m;
 			}
 			return methodWithParams;
 		}
@@ -580,13 +699,25 @@ namespace MonoDevelop.Projects.MSBuild
 			return pi.ParameterType.IsArray && pi.IsDefined (typeof (ParamArrayAttribute));
 		}
 
-		object ConvertArg (MethodInfo method, int argNum, object value, Type parameterType)
+		bool CanConvertArg (MethodBase method, int argNum, object value, Type parameterType)
 		{
 			var sval = value as string;
-			if (sval == "null")
-				return null;
+			if (sval == "null" || value == null)
+				return !parameterType.IsValueType || typeof(Nullable).IsInstanceOfType (parameterType);
 
-			if (value == null)
+			if (sval != null && parameterType == typeof (char []))
+				return true;
+
+			if (parameterType == typeof (char) && sval != null && sval.Length != 1)
+				return false;
+
+			return true;
+		}
+
+		object ConvertArg (MethodBase method, int argNum, object value, Type parameterType)
+		{
+			var sval = value as string;
+			if (sval == "null" || value == null)
 				return null;
 
 			if (sval != null && parameterType == typeof (char[]))
@@ -620,10 +751,12 @@ namespace MonoDevelop.Projects.MSBuild
 			return val != null;
 		}
 
-		bool EvaluateList (string prop, out object val)
+		bool EvaluateList (string prop, List<MSBuildItemEvaluated> evaluatedItemsCollection, out object val)
 		{
-			val = "";
-			return false;
+			string items;
+			var res = DefaultMSBuildEngine.ExecuteStringTransform (evaluatedItemsCollection, this, prop, out items);
+			val = items;
+			return res;
 		}
 
 		Type ResolveType (string typeName)
@@ -640,6 +773,10 @@ namespace MonoDevelop.Projects.MSBuild
 
 		MemberInfo[] ResolveMember (Type type, string memberName, bool isStatic)
 		{
+			if (type == typeof (string) && memberName == "new")
+				memberName = "Copy";
+			if (type.IsArray)
+				type = typeof (Array);
 			var flags = isStatic ? BindingFlags.Static : BindingFlags.Instance;
 			if (type != typeof (Microsoft.Build.Evaluation.IntrinsicFunctions)) {
 				var t = supportedTypeMembers.FirstOrDefault (st => st.Item1 == type);
@@ -654,6 +791,7 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 
 		static Tuple<Type, string []> [] supportedTypeMembers = {
+			Tuple.Create (typeof(System.Array), (string[]) null),
 			Tuple.Create (typeof(System.Byte), (string[]) null),
 			Tuple.Create (typeof(System.Char), (string[]) null),
 			Tuple.Create (typeof(System.Convert), (string[]) null),
@@ -723,12 +861,12 @@ namespace MonoDevelop.Projects.MSBuild
 			return -1;
 		}
 
-		bool IsQuote (char c)
+		static bool IsQuote (char c)
 		{
 			return c == '"' || c == '\'' || c == '`';
 		}
 
-		int FindClosingChar (string str, int i, char[] closeChar)
+		static int FindClosingChar (string str, int i, char[] closeChar)
 		{
 			int pc = 0;
 			while (i < str.Length) {
@@ -759,6 +897,17 @@ namespace MonoDevelop.Projects.MSBuild
 		public string FullFileName {
 			get {
 				return project.FileName;
+			}
+		}
+
+		public string FullDirectoryName {
+			get {
+				if (FullFileName == String.Empty)
+					return null;
+				if (directoryName == null)
+					directoryName = Path.GetDirectoryName (FullFileName);
+
+				return directoryName;
 			}
 		}
 

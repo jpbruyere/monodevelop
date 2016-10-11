@@ -45,6 +45,7 @@ using MonoDevelop.Ide.Editor;
 using MonoDevelop.Core.Text;
 using MonoDevelop.Ide.Editor.Highlighting;
 using System.Threading.Tasks;
+using MonoDevelop.Ide.TypeSystem;
 
 namespace MonoDevelop.Ide.FindInFiles
 {
@@ -280,7 +281,6 @@ namespace MonoDevelop.Ide.FindInFiles
 			buttonStop.Sensitive = false;
 			treeviewSearchResults.Model = newStore;
 
-			store.Dispose ();
 			store = newStore;
 
 			treeviewSearchResults.ThawChildNotify ();
@@ -347,7 +347,7 @@ namespace MonoDevelop.Ide.FindInFiles
 			
 			while (idx > 0) {
 				idx += "foreground=\"".Length;
-				result.Append (markup.Substring (offset, idx - offset));
+				result.Append (markup, offset, idx - offset);
 				if (idx + 7 >= markup.Length) {
 					offset = idx;
 					break;
@@ -363,7 +363,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				result.Append (colorStr);
 				idx = markup.IndexOf ("foreground=\"", idx, StringComparison.Ordinal);
 			}
-			result.Append (markup.Substring (offset, markup.Length - offset));
+			result.Append (markup, offset, markup.Length - offset);
 			return result.ToString ();
 		}
 		public static string ColorToPangoMarkup (Gdk.Color color)
@@ -394,8 +394,6 @@ namespace MonoDevelop.Ide.FindInFiles
 				return;
 			fileNamePixbufRenderer.Image = DesktopService.GetIconForFile (searchResult.FileName, IconSize.Menu);
 		}
-
-
 
 		static string MarkupText (string text, bool didRead)
 		{
@@ -543,14 +541,15 @@ namespace MonoDevelop.Ide.FindInFiles
 				return;
 			}
 			string textMarkup = markupCache.FirstOrDefault (t =>t.Item1 == searchResult)?.Item2;
-
+			bool isSelected = treeviewSearchResults.Selection.IterIsSelected (iter);
+			if (isSelected)
+				textMarkup = null;
 			if (textMarkup == null) {
 				var doc = GetDocument (searchResult);
 				if (doc == null) {
 					textMarkup = "Can't create document for:" + searchResult.FileName;
 					goto end;
 				}
-				bool isSelected = treeviewSearchResults.Selection.IterIsSelected (iter);
 				int lineNumber, startIndex = 0, endIndex = 0;
 				try {
 					lineNumber = doc.OffsetToLineNumber (searchResult.Offset); 
@@ -572,8 +571,13 @@ namespace MonoDevelop.Ide.FindInFiles
 				if (col + searchResult.Length < lineText.Length)
 					lineText = doc.GetTextAt (line.Offset, line.Length);
 
-				var markup = doc.GetPangoMarkup (line.Offset + indent, line.Length - indent);
-				markup = AdjustColors(markup);
+				string markup;
+				if (isSelected) {
+					markup = Ambience.EscapeText (doc.GetTextAt (line.Offset + indent, line.Length - indent));
+				} else {
+					markup = doc.GetPangoMarkup (line.Offset + indent, line.Length - indent);
+					markup = AdjustColors (markup);
+				}
 
 				if (col >= 0) {
 					uint start;
@@ -609,15 +613,21 @@ namespace MonoDevelop.Ide.FindInFiles
 						if (startIndex != endIndex) {
 							textMarkup = PangoHelper.ColorMarkupBackground (textMarkup, (int)startIndex, (int)endIndex, searchColor);
 						}
+					} else {
+						var searchColor = this.treeviewSearchResults.Style.Base (StateType.Selected);
+						searchColor = searchColor.AddLight (-0.2);
+						textMarkup = PangoHelper.ColorMarkupBackground (textMarkup, (int)startIndex, (int)endIndex, searchColor);
 					}
 				} catch (Exception e) {
 					LoggingService.LogError ("Error whil setting the text renderer markup to: " + markup, e);
 				}
 			end:
 				textMarkup = textMarkup.Replace ("\t", new string (' ', doc.Options.TabSize));
-				markupCache.Add (Tuple.Create(searchResult, textMarkup));
-				if (markupCache.Count > 100)
-					markupCache.RemoveAt (0);
+				if (!isSelected) {
+					markupCache.Add (Tuple.Create (searchResult, textMarkup));
+					if (markupCache.Count > 100)
+						markupCache.RemoveAt (0);
+				}
 			}
 			textRenderer.Markup = textMarkup;
 		}
@@ -677,7 +687,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				if (content == null)
 					return null;
 
-				doc = TextEditorFactory.CreateNewEditor (TextEditorFactory.CreateNewReadonlyDocument (new StringTextSource (content), result.FileName, DesktopService.GetMimeTypeForUri (result.FileName)));
+				doc = TextEditorFactory.CreateNewEditor (TextEditorFactory.CreateNewReadonlyDocument (new StringTextSource (content.ReadToEnd ()), result.FileName, DesktopService.GetMimeTypeForUri (result.FileName)));
 
 				documents [result.FileName] = doc;	
 			}
@@ -850,7 +860,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				if (buf != null) {
 					doc.DisableAutoScroll ();
 					buf.RunWhenLoaded (() => {
-						buf.SetCaretLocation (Math.Max (Line, 1), Math.Max (Column, 1));
+						JumpToCurrentLocation (buf);
 					});
 				}
 				
@@ -891,7 +901,7 @@ namespace MonoDevelop.Ide.FindInFiles
 								markupBuilder.Append ("</span>");
 								opened = false;
 							}
-							markupBuilder.Append (textMarkup.Substring(j + 1));
+							markupBuilder.Append (textMarkup, j + 1, textMarkup.Length - j - 1);
 							return ColorMarkupBackground (markupBuilder.ToString (), i, endIndex, searchColor);
 						}
 						continue;
@@ -904,7 +914,7 @@ namespace MonoDevelop.Ide.FindInFiles
 						markupBuilder.Append ("</span>");
 						opened = false;
 					}
-					markupBuilder.Append (textMarkup.Substring (j));
+					markupBuilder.Append (textMarkup, j, textMarkup.Length - j);
 					closed = true;
 					break;
 				}
@@ -926,7 +936,7 @@ namespace MonoDevelop.Ide.FindInFiles
 				markupBuilder.Append (ch);
 				i++;
 			}
-			if (!closed && !opened)
+			if (!closed && opened)
 				markupBuilder.Append ("</span>");
 			return markupBuilder.ToString ();
 		}

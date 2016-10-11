@@ -189,7 +189,7 @@ namespace MonoDevelop.CSharp.Completion
 			var Policy = ext.FormattingPolicy;
 			string insertionText = this.GetInsertionText();
 
-			if (addParens && !IsDelegateExpected && method != null && !HasNonMethodMembersWithSameName (window, Symbol) && !IsBracketAlreadyInserted (ext, method)) {
+			if (addParens && !IsDelegateExpected && method != null && !IsBracketAlreadyInserted (ext, method)) {
 				var line = Editor.GetLine (Editor.CaretLine);
 				//var start = window.CodeCompletionContext.TriggerOffset + partialWord.Length + 2;
 				//var end = line.Offset + line.Length;
@@ -295,9 +295,8 @@ namespace MonoDevelop.CSharp.Completion
 			}
 			window.CompletionWidget.SetCompletionText (window.CodeCompletionContext, partialWord, insertionText);
 			int offset = Editor.CaretOffset;
-			for (int i = skipChars - 1; i --> 0;) {
-				Editor.StartSession (new SkipCharSession (Editor.GetCharAt (offset)));
-				offset++;
+			for (int i = skipChars; i --> 0;) {
+				Editor.StartSession (new SkipCharSession (Editor.GetCharAt (offset + i)));
 			}
 
 			if (runParameterCompletionCommand && IdeApp.Workbench != null) {
@@ -377,32 +376,7 @@ namespace MonoDevelop.CSharp.Completion
 				.Any (m => m.Name == method.Name && m.Parameters.Length > 0);
 		}
 
-		bool HasNonMethodMembersWithSameName (CompletionListWindow window, ISymbol member)
-		{
-			var method = member as IMethodSymbol;
-			if (method == null)
-				return true;
-			if (method == null || method.MethodKind == MethodKind.Constructor)
-				return false;
 
-			ITypeSymbol type = null;
-			var model = ext.DocumentContext.AnalysisDocument?.GetSemanticModelAsync ().WaitAndGetResult(default(CancellationToken));
-			if (model == null)
-				return false;
-			var token = model.SyntaxTree.FindTokenOnLeftOfPosition (window.StartOffset, default (CancellationToken));
-			var node = token.Parent as MemberAccessExpressionSyntax;
-			if (node != null) {
-				type = model.GetTypeInfo (node.Expression, default (CancellationToken)).Type;
-			}
-
-			if (type == null)
-				type = method.ReceiverType ?? method.ContainingType;
-			foreach (var m in type.GetMembers ().Where (m => m.Kind != SymbolKind.Method)) {
-				if (m.Name == member.Name)
-					return true;
-			}
-			return false;
-		}
 
 		static bool RequireGenerics (IMethodSymbol method)
 		{
@@ -415,19 +389,25 @@ namespace MonoDevelop.CSharp.Completion
 			
 			if (!typeArgs.Any (ta => ta.TypeKind == TypeKind.TypeParameter))
 				return false;
-			var testMethod = method.ReducedFrom ?? method;
-			return typeArgs.Any (t => !testMethod.Parameters.Any (p => ContainsType(p.Type, t)));
+
+			var parameterTypes = new List<ITypeSymbol> (method.Parameters.Select (p => p.Type));
+			if (method.IsExtensionMethod) {
+				parameterTypes.Add (method.ReducedFrom.Parameters [0].Type);
+			}
+
+			return typeArgs.Any (t => !parameterTypes.Any (pt => ContainsType (pt, t)));
 		}
 
 		static bool ContainsType (ITypeSymbol testType, ITypeSymbol searchType)
 		{
 			if (testType == null)
 				return false;
+			Console.WriteLine (testType +" == " + searchType + " ? " + (testType == searchType) + "/" + testType.Equals (searchType));
 			if (testType == searchType)
 				return true;
 			var namedTypeSymbol = testType as INamedTypeSymbol;
 			if (namedTypeSymbol != null) {
-				foreach (var arg in namedTypeSymbol.TypeParameters)
+				foreach (var arg in namedTypeSymbol.TypeArguments)
 					if (ContainsType (arg, searchType))
 						return true;
 			}

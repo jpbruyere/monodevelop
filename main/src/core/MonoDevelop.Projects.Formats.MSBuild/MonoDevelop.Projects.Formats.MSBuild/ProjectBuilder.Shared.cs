@@ -79,22 +79,34 @@ namespace MonoDevelop.Projects.MSBuild
 		void DisposeLogger ()
 		{
 			lock (flushLogLock)
-			lock (log) {
-				if (currentLogWriter != null) {
-					flushTimer.Dispose ();
-					flushTimer = null;
-					FlushLog ();
-					currentLogWriter = null;
-				}
+				lock (log) {
+					if (currentLogWriter != null) {
+						try {
+							flushTimer.Dispose ();
+							FlushLog ();
+						} catch {
+							// Ignoree
+						} finally {
+							// This needs to be done inside the finally, to make sure it is called even in
+							// the case the thread is being aborted.
+							flushTimer = null;
+							currentLogWriter = null;
+						}
+					}
 			}
 		}
 
 		void LogWriteLine (string txt)
 		{
+			LogWrite (txt + Environment.NewLine);
+		}
+
+		void LogWrite (string txt)
+		{
 			lock (log) {
 				if (currentLogWriter != null) {
 					// Append the line to the log, and schedule the flush of the log, unless it has already been done
-					log.AppendLine (txt);
+					log.Append (txt);
 					if (!flushingLog) {
 						// Flush the log after 100ms
 						flushingLog = true;

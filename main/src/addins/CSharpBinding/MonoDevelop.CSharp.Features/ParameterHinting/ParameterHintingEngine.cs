@@ -122,7 +122,7 @@ namespace ICSharpCode.NRefactory6.CSharp.Completion
 
 		ParameterHintingResult HandleInvocationExpression(SemanticModel semanticModel, InvocationExpressionSyntax node, CancellationToken cancellationToken)
 		{
-			var info = semanticModel.GetSymbolInfo(node, cancellationToken);
+			var info = semanticModel.GetSymbolInfo (node, cancellationToken);
 			var result = new ParameterHintingResult(node.SpanStart);
 
 			var targetTypeInfo = semanticModel.GetTypeInfo (node.Expression);
@@ -133,12 +133,17 @@ namespace ICSharpCode.NRefactory6.CSharp.Completion
 
 			var within = semanticModel.GetEnclosingNamedTypeOrAssembly(node.SpanStart, cancellationToken);
 			ITypeSymbol type;
-			var ma = node.Expression as MemberAccessExpressionSyntax;
 			string name = null;
 			bool staticLookup = false;
-			if (ma != null) {
+			var ma = node.Expression as MemberAccessExpressionSyntax;
+			var mb = node.Expression as MemberBindingExpressionSyntax;
+			if (mb != null) {
+				info = semanticModel.GetSymbolInfo (mb, cancellationToken);
+				type = (info.Symbol ?? info.CandidateSymbols.FirstOrDefault ())?.ContainingType;
+				name = mb.Name.Identifier.ValueText;
+			} else if (ma != null) {
 				staticLookup = semanticModel.GetSymbolInfo (ma.Expression).Symbol is ITypeSymbol;
-				type = semanticModel.GetTypeInfo (ma.Expression).Type; 
+				type = semanticModel.GetTypeInfo (ma.Expression).Type;
 				name = info.Symbol?.Name ?? ma.Name.Identifier.ValueText;
 			} else {
 				type = within as ITypeSymbol;
@@ -179,7 +184,7 @@ namespace ICSharpCode.NRefactory6.CSharp.Completion
 
 		IEnumerable<IMethodSymbol> GetExtensionMethods (SemanticModel semanticModel, ITypeSymbol typeToExtend, InvocationExpressionSyntax node, CancellationToken cancellationToken)
 		{
-			var usedNamespaces = new HashSet<string> ();
+			var usedNamespaces = new List<string> ();
 			foreach (var un in semanticModel.GetUsingNamespacesInScope (node)) {
 				usedNamespaces.Add (un.GetFullName ());
 			}
@@ -197,7 +202,7 @@ namespace ICSharpCode.NRefactory6.CSharp.Completion
 
 					foreach (var member in currentNs.GetNamespaceMembers ()) {
 						var currentNsName = member.GetFullName ();
-						if (usedNamespaces.Contains (currentNsName) ||
+						if (usedNamespaces.Any (u => u.StartsWith (currentNsName, StringComparison.Ordinal)) ||
 							enclosingNamespaceName == currentNsName ||
 							(enclosingNamespaceName.StartsWith (currentNsName, StringComparison.Ordinal) &&
 							enclosingNamespaceName [currentNsName.Length] == '.')) {
@@ -264,9 +269,13 @@ namespace ICSharpCode.NRefactory6.CSharp.Completion
 			var info = semanticModel.GetSymbolInfo(node, cancellationToken);
 			var result = new ParameterHintingResult(node.SpanStart);
 			var resolvedMethod = info.Symbol as IMethodSymbol;
-			if (resolvedMethod != null)
-				result.AddData(factory.CreateConstructorProvider(resolvedMethod));
-			result.AddRange(info.CandidateSymbols.OfType<IMethodSymbol>().Select (m => factory.CreateConstructorProvider(m)));
+			if (resolvedMethod != null) {
+				foreach (var c in resolvedMethod.ContainingType.GetMembers ().OfType<IMethodSymbol> ().Where (m => m.MethodKind == MethodKind.Constructor)) {
+					result.AddData (factory.CreateConstructorProvider (c));
+				}
+			} else {
+				result.AddRange (info.CandidateSymbols.OfType<IMethodSymbol> ().Select (factory.CreateConstructorProvider));
+			}
 			return result;
 		}
 		
@@ -278,7 +287,7 @@ namespace ICSharpCode.NRefactory6.CSharp.Completion
 			var resolvedMethod = info.Symbol as IMethodSymbol;
 			if (resolvedMethod != null)
 				result.AddData(factory.CreateConstructorProvider(resolvedMethod));
-			result.AddRange(info.CandidateSymbols.OfType<IMethodSymbol>().Select (m => factory.CreateConstructorProvider(m)));
+			result.AddRange(info.CandidateSymbols.OfType<IMethodSymbol>().Select (factory.CreateConstructorProvider));
 			return result;
 		}
 		

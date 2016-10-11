@@ -95,7 +95,7 @@ namespace MonoDevelop.UnitTesting.NUnit
 
 		public static NUnitVersion? GetNUnitVersion (ProjectReference p)
 		{
-			if (p.Reference.IndexOf ("GuiUnit", StringComparison.OrdinalIgnoreCase) != -1 || p.Reference.IndexOf ("nunitlite", StringComparison.OrdinalIgnoreCase) != -1)
+			if (p.Reference.IndexOf ("GuiUnit", StringComparison.OrdinalIgnoreCase) != -1 || p.Reference.StartsWith ("nunitlite", StringComparison.OrdinalIgnoreCase))
 				return NUnitVersion.NUnit2;
 			if (p.Reference.IndexOf ("nunit.framework", StringComparison.OrdinalIgnoreCase) != -1) {
 				var selector = p.Project?.DefaultConfiguration.Selector;
@@ -120,7 +120,7 @@ namespace MonoDevelop.UnitTesting.NUnit
 
 		protected override SourceCodeLocation GetSourceCodeLocation (string fixtureTypeNamespace, string fixtureTypeName, string testName)
 		{
-			if (string.IsNullOrEmpty (fixtureTypeName) || string.IsNullOrEmpty (fixtureTypeName))
+			if (string.IsNullOrEmpty (fixtureTypeName))
 				return null;
 			var task = NUnitSourceCodeLocationFinder.TryGetSourceCodeLocationAsync (project, fixtureTypeNamespace, fixtureTypeName, testName);
 			if (!task.Wait (2000))

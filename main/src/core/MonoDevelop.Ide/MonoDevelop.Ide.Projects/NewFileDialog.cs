@@ -154,16 +154,6 @@ namespace MonoDevelop.Ide.Projects
 			}
 		}
 
-
-		protected override void OnDestroyed ()
-		{
-			if (catStore != null) {
-				catStore.Dispose ();
-				catStore = null;
-			}
-			base.OnDestroyed ();
-		}
-
 		static string GetCategoryPropertyKey (Project proj)
 		{
 			string key = "Dialogs.NewFileDialog.LastSelectedCategory";
@@ -493,7 +483,7 @@ namespace MonoDevelop.Ide.Projects
 						return;
 				} catch (Exception ex) {
 					LoggingService.LogError ("Error creating file", ex);
-					MessageService.ShowError ("Error creating file", ex);
+					MessageService.ShowError (GettextCatalog.GetString ("Error creating file"), ex);
 					return;
 				}
 
@@ -604,6 +594,7 @@ namespace MonoDevelop.Ide.Projects
 
 			catStore.SetSortColumnId (0, SortType.Ascending);
 			catView.Model = catStore;
+			catView.SearchColumn = -1; // disable the interactive search
 
 			okButton.Clicked += new EventHandler (OpenEvent);
 			cancelButton.Clicked += new EventHandler (cancelClicked);
@@ -764,6 +755,7 @@ namespace MonoDevelop.Ide.Projects
 				HeadersVisible = false;
 				templateStore = new ListStore (typeof(string), typeof(string), typeof(TemplateItem));
 				Model = templateStore;
+				SearchColumn = -1; // disable the interactive search
 
 				SemanticModelAttribute modelAttr = new SemanticModelAttribute ("templateStore__Icon", "templateStore__Name", "templateStore__Template");
 				TypeDescriptor.AddAttributes (templateStore, modelAttr);

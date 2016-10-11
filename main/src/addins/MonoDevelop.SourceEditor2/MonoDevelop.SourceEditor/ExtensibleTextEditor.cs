@@ -599,7 +599,8 @@ namespace MonoDevelop.SourceEditor
 				var links = result.TextLinks.Select (l => new Mono.TextEditor.TextLink (l.Name) {
 					Links = l.Links.Select (s => new TextSegment (s.Offset, s.Length)).ToList (),
 					IsEditable = l.IsEditable,
-					IsIdentifier = l.IsIdentifier
+					IsIdentifier = l.IsIdentifier,
+					GetStringFunc = l.GetStringFunc != null ? (Func<Func<string, string>, Mono.TextEditor.PopupWindow.IListDataProvider<string>>)(arg => new ListDataProviderWrapper (l.GetStringFunc (arg))) : null
 				}).ToList ();
 				var tle = new TextLinkEditMode (this, result.InsertPosition, links);
 				tle.TextLinkMode = TextLinkMode.General;
@@ -607,6 +608,10 @@ namespace MonoDevelop.SourceEditor
 					tle.OldMode = CurrentMode;
 					tle.StartMode ();
 					CurrentMode = tle;
+					GLib.Timeout.Add (10, delegate {
+						tle.UpdateTextLinks ();
+						return false;
+					}); 
 				}
 			}
 		}
@@ -757,6 +762,18 @@ namespace MonoDevelop.SourceEditor
 		internal void OnScrollPageDown ()
 		{
 			RunAction (ScrollActions.PageDown);
+		}
+
+		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollTop)]
+		internal void OnScrollTop ()
+		{
+			RunAction (ScrollActions.Top);
+		}
+
+		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.ScrollBottom)]
+		internal void OnScrollBottom ()
+		{
+			RunAction (ScrollActions.Bottom);
 		}
 
 		[CommandHandler (MonoDevelop.Ide.Commands.TextEditorCommands.GotoMatchingBrace)]

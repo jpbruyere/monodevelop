@@ -100,6 +100,14 @@ namespace MonoDevelop.Projects.MSBuild
 
 			AddinManager.ExtensionChanged += OnExtensionChanged;
 			LoadExtensionData ();
+
+			specialCharactersEscaped = new Dictionary<char, string> (specialCharacters.Length);
+			specialCharactersUnescaped = new Dictionary<string, char> (specialCharacters.Length);
+			for (int i = 0; i < specialCharacters.Length; ++i) {
+				var escaped = ((int)specialCharacters [i]).ToString ("X");
+				specialCharactersEscaped [specialCharacters [i]] = '%' + escaped;
+				specialCharactersUnescaped [escaped] = specialCharacters [i];
+			}
 		}
 
 		static void OnExtensionChanged (object sender, ExtensionEventArgs args)
@@ -671,13 +679,26 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 		
 		static char[] specialCharacters = new char [] {'%', '$', '@', '(', ')', '\'', ';', '?' };
+		static Dictionary<char, string> specialCharactersEscaped;
+		static Dictionary<string, char> specialCharactersUnescaped;
 		
 		public static string EscapeString (string str)
 		{
 			int i = str.IndexOfAny (specialCharacters);
-			while (i != -1) {
-				str = str.Substring (0, i) + '%' + ((int) str [i]).ToString ("X") + str.Substring (i + 1);
-				i = str.IndexOfAny (specialCharacters, i + 3);
+			if (i != -1) {
+				var sb = new System.Text.StringBuilder ();
+				int start = 0;
+				while (i != -1) {
+					sb.Append (str, start, i - start);
+					sb.Append (specialCharactersEscaped [str [i]]);
+					if (i >= str.Length)
+						break;
+					start = i + 1;
+					i = str.IndexOfAny (specialCharacters, start);
+				}
+				if (start < str.Length)
+					sb.Append (str, start, str.Length - start);
+				return sb.ToString ();
 			}
 			return str;
 		}
@@ -696,11 +717,25 @@ namespace MonoDevelop.Projects.MSBuild
 		public static string UnscapeString (string str)
 		{
 			int i = str.IndexOf ('%');
-			while (i != -1 && i < str.Length - 2) {
-				int c;
-				if (int.TryParse (str.Substring (i+1, 2), NumberStyles.HexNumber, null, out c))
-					str = str.Substring (0, i) + (char) c + str.Substring (i + 3);
-				i = str.IndexOf ('%', i + 1);
+			if (i != -1) {
+				var sb = new System.Text.StringBuilder ();
+				int start = 0;
+				while (i != -1) {
+					int c;
+					char ch;
+					var sub = str.Substring (i + 1, 2);
+					if (specialCharactersUnescaped.TryGetValue (sub, out ch)) {
+						sb.Append (str, start, i - start);
+						sb.Append (ch);
+					} else if (int.TryParse (sub, NumberStyles.HexNumber, null, out c)) {
+						sb.Append (str, start, i - start);
+						sb.Append ((char)c);
+					}
+					start = i + 3;
+					i = str.IndexOf ('%', start);
+				}
+				sb.Append (str, start, str.Length - start);
+				return sb.ToString ();
 			}
 			return str;
 		}
@@ -817,8 +852,8 @@ namespace MonoDevelop.Projects.MSBuild
 				if (fpath == null) {
 					// Part of the path does not exist. Can't do any more checking.
 					part = Path.GetFullPath (part);
-					for (; n < names.Length; n++)
-						part += "/" + names[n];
+					if (n < names.Length)
+						part += "/" + string.Join ("/", names, n, names.Length - n);
 					resultPath = part;
 					return true;
 				}
@@ -870,35 +905,32 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 
 		static bool runLocal = false;
+
+		static string GetNewestInstalledToolsVersion (TargetRuntime runtime, out string binDir)
+		{
+			var supportedToolsVersions = new [] { "15.0", "14.0", "12.0", "4.0" };
+
+			foreach (var toolsVersion in supportedToolsVersions) {
+				binDir = runtime.GetMSBuildBinPath (toolsVersion);
+				if (binDir != null) {
+					return toolsVersion;
+				}
+			}
+			throw new Exception ("Did not find MSBuild for runtime " + runtime.Id);
+		}
 		
 		internal static async Task<RemoteProjectBuilder> GetProjectBuilder (TargetRuntime runtime, string minToolsVersion, string file, string solutionFile, int customId, bool lockBuilder = false)
 		{
 			using (await buildersLock.EnterAsync ())
 			{
-				//attempt to use 14.0 builder first if available
-				string toolsVersion = "14.0";
-				string binDir = runtime.GetMSBuildBinPath ("14.0");
-				if (binDir == null) {
-					toolsVersion = "12.0";
-					binDir = runtime.GetMSBuildBinPath ("12.0");
-					if (binDir == null) {
-						//fall back to 4.0, we know it's always available
-						toolsVersion = "4.0";
-					}
-				}
+				string binDir;
+				var toolsVersion = GetNewestInstalledToolsVersion (runtime, out binDir);
 
-				// Check the ToolsVersion we found can handle the project
-				// The check is only done for the .NET framework since Mono doesn't really have the concept of ToolsVersion.
-				// On Mono we'll just try to build with whatever is installed.
 				Version tv, mtv;
-				if (runtime is MsNetTargetRuntime && Version.TryParse (toolsVersion, out tv) && Version.TryParse (minToolsVersion, out mtv) && tv < mtv) {
-					string error = null;
-					if (minToolsVersion == "12.0")
-						error = "MSBuild 2013 is not installed. Please download and install it from " +
-						"http://www.microsoft.com/en-us/download/details.aspx?id=40760";
-					throw new InvalidOperationException (error ?? string.Format (
-						"Runtime '{0}' does not have MSBuild '{1}' ToolsVersion installed",
-						runtime.Id, toolsVersion)
+				if (Version.TryParse (toolsVersion, out tv) && Version.TryParse (minToolsVersion, out mtv) && tv < mtv) {
+					throw new InvalidOperationException (string.Format (
+						"Project requires MSBuild ToolsVersion '{0}' which is not supported by runtime '{1}'",
+						toolsVersion, runtime.Id)
 					);
 				}
 
@@ -930,6 +962,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 					MonoDevelop.Core.Execution.RemotingService.RegisterRemotingChannel ();
 					var pinfo = new ProcessStartInfo (exe) {
+						WorkingDirectory = binDir,
 						UseShellExecute = false,
 						CreateNoWindow = true,
 						RedirectStandardError = true,
@@ -963,6 +996,9 @@ namespace MonoDevelop.Projects.MSBuild
 									Console.WriteLine (e.Data);
 							};
 							p.BeginErrorReadLine ();
+
+							p.StandardInput.WriteLine (binDir);
+
 							p.StandardInput.WriteLine (Process.GetCurrentProcess ().Id.ToString ());
 							if (await Task.WhenAny (processStartedSignal.Task, Task.Delay (5000)) != processStartedSignal.Task)
 								throw new Exception ("MSBuild process could not be started");
@@ -1029,16 +1065,22 @@ namespace MonoDevelop.Projects.MSBuild
 		
 		static string GetExeLocation (TargetRuntime runtime, string toolsVersion)
 		{
-			FilePath sourceExe = typeof(MSBuildProjectService).Assembly.Location;
+			var builderDir = new FilePath (typeof(MSBuildProjectService).Assembly.Location).ParentDirectory.Combine ("MSBuild");
 
-			if ((runtime is MsNetTargetRuntime) && int.Parse (toolsVersion.Split ('.')[0]) >= 4)
-				toolsVersion = "dotnet." + toolsVersion;
+			var version = Version.Parse (toolsVersion);
+			bool useMicrosoftBuild =
+				((version >= new Version (15, 0)) && Runtime.Preferences.BuildWithMSBuild) ||
+				(version >= new Version (4, 0) && runtime is MsNetTargetRuntime);
 
-			var exe = sourceExe.ParentDirectory.Combine ("MSBuild", toolsVersion, "MonoDevelop.Projects.Formats.MSBuild.exe");
+			if (useMicrosoftBuild) {
+				toolsVersion = "dotnet." + (version >= new Version (15, 0) ? "14.1" : toolsVersion);
+			}
+
+			var exe = builderDir.Combine (toolsVersion, "MonoDevelop.Projects.Formats.MSBuild.exe");
 			if (File.Exists (exe))
 				return exe;
 			
-			throw new InvalidOperationException ("Unsupported MSBuild ToolsVersion '" + toolsVersion + "'");
+			throw new InvalidOperationException ("Unsupported MSBuild ToolsVersion '" + version + "'");
 		}
 
 		internal static async void ReleaseProjectBuilder (RemoteBuildEngine engine)

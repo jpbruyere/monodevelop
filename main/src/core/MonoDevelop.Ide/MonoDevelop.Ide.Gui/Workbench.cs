@@ -55,6 +55,7 @@ using MonoDevelop.Ide.Editor;
 using MonoDevelop.Components;
 using System.Threading.Tasks;
 using System.Collections.Immutable;
+using MonoDevelop.Core.Instrumentation;
 
 namespace MonoDevelop.Ide.Gui
 {
@@ -145,9 +146,16 @@ namespace MonoDevelop.Ide.Gui
 		{
 			return workbench.Close();
 		}
-		
+
 		public ImmutableList<Document> Documents {
 			get { return documents; }
+		}
+
+		/// <summary>
+		/// This is a wrapper for use with AutoTest
+		/// </summary>
+		internal bool DocumentsDirty {
+			get { return Documents.Any (d => d.IsDirty); }
 		}
 
 		public Document ActiveDocument {
@@ -169,6 +177,27 @@ namespace MonoDevelop.Ide.Gui
 					return doc;
 			}
 			return null;
+		}
+
+		internal TextReader[] GetDocumentReaders (List<string> filenames)
+		{
+			TextReader [] results = new TextReader [filenames.Count];
+
+			int idx = 0;
+			foreach (var f in filenames) {
+				var fullPath = (FilePath)FileService.GetFullPath (f);
+
+				Document doc = documents.Find (d => d.Editor != null && (fullPath == FileService.GetFullPath (d.Name)));
+				if (doc != null) {
+					results [idx] = doc.Editor.CreateReader ();
+				} else {
+					results [idx] = null;
+				}
+
+				idx++;
+			}
+
+			return results;
 		}
 
 		public PadCollection Pads {
@@ -316,12 +345,17 @@ namespace MonoDevelop.Ide.Gui
 		
 		public void SaveAll ()
 		{
-			// Make a copy of the list, since it may change during save
-			Document[] docs = new Document [Documents.Count];
-			Documents.CopyTo (docs, 0);
-			
-			foreach (Document doc in docs)
-				doc.Save ();
+			ITimeTracker tt = Counters.SaveAllTimer.BeginTiming ();
+			try {
+				// Make a copy of the list, since it may change during save
+				Document[] docs = new Document [Documents.Count];
+				Documents.CopyTo (docs, 0);
+
+				foreach (Document doc in docs)
+					doc.Save ();
+			} finally {
+				tt.End ();
+			}
 		}
 
 		internal bool SaveAllDirtyFiles ()
@@ -522,32 +556,37 @@ namespace MonoDevelop.Ide.Gui
 			// Ensure that paths like /a/./a.cs are equalized 
 			using (Counters.OpenDocumentTimer.BeginTiming ("Opening file " + info.FileName)) {
 				NavigationHistoryService.LogActiveDocument ();
-				if (info.Options.HasFlag (OpenDocumentOptions.TryToReuseViewer)) {
-					Counters.OpenDocumentTimer.Trace ("Look for open document");
-					foreach (Document doc in Documents) {
-						BaseViewContent vcFound = null;
+				Counters.OpenDocumentTimer.Trace ("Look for open document");
+				foreach (Document doc in Documents) {
+					BaseViewContent vcFound = null;
 
-						//search all ViewContents to see if they can "re-use" this filename
-						if (doc.Window.ViewContent.CanReuseView (info.FileName))
-							vcFound = doc.Window.ViewContent;
-						
-						//old method as fallback
-						if ((vcFound == null) && (doc.FileName.CanonicalPath == info.FileName)) // info.FileName is already Canonical
-							vcFound = doc.Window.ViewContent;
-						//if found, select window and jump to line
-						if (vcFound != null) {
+					//search all ViewContents to see if they can "re-use" this filename
+					if (doc.Window.ViewContent.CanReuseView (info.FileName))
+						vcFound = doc.Window.ViewContent;
+					
+					//old method as fallback
+					if ((vcFound == null) && (doc.FileName.CanonicalPath == info.FileName)) // info.FileName is already Canonical
+						vcFound = doc.Window.ViewContent;
+					//if found, try to reuse or close the old view
+					if (vcFound != null) {
+						// reuse the view if the binidng didn't change
+						if (info.Options.HasFlag (OpenDocumentOptions.TryToReuseViewer) || vcFound.Binding == info.DisplayBinding) {
 							if (info.Project != null && doc.Project != info.Project) {
-								doc.SetProject (info.Project); 
+								doc.SetProject (info.Project);
 							}
 
 							ScrollToRequestedCaretLocation (doc, info);
-							
+
 							if (info.Options.HasFlag (OpenDocumentOptions.BringToFront)) {
 								doc.Select ();
 								doc.Window.SelectWindow ();
 								NavigationHistoryService.LogActiveDocument ();
 							}
 							return doc;
+						} else {
+							if (!doc.Close ())
+								return doc;
+							break;
 						}
 					}
 				}
@@ -639,6 +678,7 @@ namespace MonoDevelop.Ide.Gui
 			
 			newContent.UntitledName = defaultName;
 			newContent.IsDirty = true;
+			newContent.Binding = binding;
 			workbench.ShowView (newContent, true, binding);
 
 			var document = WrapDocument (newContent.WorkbenchWindow);
@@ -778,7 +818,7 @@ namespace MonoDevelop.Ide.Gui
 			window.Closing += OnWindowClosing;
 			window.Closed += OnWindowClosed;
 			documents = documents.Add (doc);
-			
+
 			doc.OnDocumentAttached ();
 			OnDocumentOpened (new DocumentEventArgs (doc));
 			
@@ -833,7 +873,8 @@ namespace MonoDevelop.Ide.Gui
 			var doc = FindDocument (window);
 			window.Closing -= OnWindowClosing;
 			window.Closed -= OnWindowClosed;
-			documents = documents.Remove (doc); 
+			documents = documents.Remove (doc);
+
 			OnDocumentClosed (doc);
 			doc.DisposeDocument ();
 		}
@@ -1180,7 +1221,7 @@ namespace MonoDevelop.Ide.Gui
 		}
 
 		List<FileData> fileStatus;
-		object fileStatusLock = new object ();
+		SemaphoreSlim fileStatusLock = new SemaphoreSlim (1, 1);
 		// http://msdn.microsoft.com/en-us/library/system.io.file.getlastwritetimeutc(v=vs.110).aspx
 		static DateTime NonExistentFile = new DateTime(1601, 1, 1);
 		internal void SaveFileStatus ()
@@ -1190,9 +1231,10 @@ namespace MonoDevelop.Ide.Gui
 			fileStatus = new List<FileData> (files.Count);
 //			Console.WriteLine ("SaveFileStatus(0) " + (DateTime.Now - t).TotalMilliseconds + "ms " + files.Count);
 			
-			ThreadPool.QueueUserWorkItem (delegate {
+			Task.Run (async delegate {
 //				t = DateTime.Now;
-				lock (fileStatusLock) {
+				try {
+					await fileStatusLock.WaitAsync ();
 					if (fileStatus == null)
 						return;
 					foreach (FilePath file in files) {
@@ -1201,9 +1243,10 @@ namespace MonoDevelop.Ide.Gui
 							FileData fd = new FileData (file, ft != NonExistentFile ? ft : DateTime.MinValue);
 							fileStatus.Add (fd);
 						} catch {
-							// Ignore
-						}
+							// Ignore						}
 					}
+				} finally {
+					fileStatusLock.Release ();
 				}
 //				Console.WriteLine ("SaveFileStatus " + (DateTime.Now - t).TotalMilliseconds + "ms " + fileStatus.Count);
 			});
@@ -1214,10 +1257,11 @@ namespace MonoDevelop.Ide.Gui
 			if (fileStatus == null)
 				return;
 			
-			ThreadPool.QueueUserWorkItem (delegate {
-				lock (fileStatusLock) {
+			Task.Run (async delegate {
+				try {
 //					DateTime t = DateTime.Now;
 
+					await fileStatusLock.WaitAsync ();
 					if (fileStatus == null)
 						return;
 					List<FilePath> modified = new List<FilePath> (fileStatus.Count);
@@ -1236,9 +1280,11 @@ namespace MonoDevelop.Ide.Gui
 					}
 					if (modified.Count > 0)
 						FileService.NotifyFilesChanged (modified);
-					
+
 //					Console.WriteLine ("CheckFileStatus " + (DateTime.Now - t).TotalMilliseconds + "ms " + fileStatus.Count);
 					fileStatus = null;
+				} finally {
+					fileStatusLock.Release ();
 				}
 			});
 		}
@@ -1506,7 +1552,8 @@ namespace MonoDevelop.Ide.Gui
 					monitor.ReportError (GettextCatalog.GetString ("The file '{0}' could not be opened.", fileName), null);
 					return false;
 				}
-				
+
+				newContent.Binding = binding;
 				if (project != null)
 					newContent.Project = project;
 				

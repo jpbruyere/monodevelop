@@ -21,8 +21,18 @@ clean-local: sln_clean
 	cd external && $(MAKE) clean
 	cd build && $(MAKE) clean
 
+NUGET_FOUND = $$(echo $$(which nuget))
+NUGET_RESTORE = \
+	if [ "x$(NUGET_FOUND)" = "x" ] || [ "x$(OSTYPE)" = "xlinux-gnu" ]; then \
+		mono external/nuget-binary/nuget.exe restore; \
+	else \
+		nuget restore; \
+	fi;
+
+#FIXME: move the restore logic into MSBuild (Before.sln.targets),
+#       see: https://github.com/kzu/NuGet.Restore
 restore-packages:
-	mono .nuget/NuGet.exe restore
+	@$(NUGET_RESTORE)
 
 vcrevision:
 	touch vcrevision
@@ -42,6 +52,9 @@ buildinfo_DATA = $(buildinfo)
 
 desktopdir = $(datadir)/applications
 desktop_DATA = monodevelop.desktop
+
+appdatadir = $(datadir)/appdata
+appdata_DATA = monodevelop.appdata.xml
 
 xdgmimedir = $(datadir)/mime/packages
 xdgmime_DATA = monodevelop.xml
@@ -70,6 +83,7 @@ PACKAGES = \
 	build/AddIns/MonoDevelop.SourceEditor.addin.xml \
 	build/AddIns/BackendBindings/BooBinding.addin.xml \
 	build/AddIns/BackendBindings/CSharpBinding.addin.xml \
+	external/fsharpbinding/MonoDevelop.FSharpBinding/FSharpBinding.addin.xml \
 	build/AddIns/BackendBindings/ILAsmBinding.addin.xml \
 	build/AddIns/BackendBindings/JavaBinding.addin.xml \
 	build/AddIns/BackendBindings/VBNetBinding.addin.xml \
@@ -117,7 +131,7 @@ run: run-sgen
 endif
 
 run-bundle: $(PROGRAM)
-	$(MD_LAUNCH_SETUP) $(MD_LAUNCH_EXTRA_ENV) $(MD_BIN_PATH)/MonoDevelop --no-redirect
+	LANG= LC_ALL= $(MD_LAUNCH_SETUP) $(MD_LAUNCH_EXTRA_ENV) $(MD_BIN_PATH)/MonoDevelop --no-redirect
 run-64: run-sgen-64
 
 run-boehm: runmd
@@ -180,7 +194,7 @@ app-dir: all
 #cp -a build/bin $(MAC_APP_LIB_DIR)
 
 # we can't use the variables that are conditionally defined
-EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(pixmap_DATA) \
+EXTRA_DIST = $(bin_SCRIPTS) $(desktop_DATA) $(appdata_DATA) $(pixmap_DATA) \
 	monodevelop.xml $(pkgconfig_in_files) external/Makefile.in \
 	Main.sln \
 	md.targets

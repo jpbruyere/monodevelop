@@ -235,7 +235,12 @@ namespace MonoDevelop.Ide.Editor
 					return DefaultSourceEditorOptions.Instance.IncludeWhitespaces;
 				}
 			}
-
+			
+			bool ITextEditorOptions.SmartBackspace {
+				get {
+					return DefaultSourceEditorOptions.Instance.SmartBackspace;
+				}
+			}
 			#endregion
 
 
@@ -356,17 +361,6 @@ namespace MonoDevelop.Ide.Editor
 			}
 			set {
 				if (smartSemicolonPlacement.Set (value))
-					OnChanged (EventArgs.Empty);
-			}
-		}
-		
-		ConfigurationProperty<bool> underlineErrors = ConfigurationProperty.Create ("UnderlineErrors", true);
-		public bool UnderlineErrors {
-			get {
-				return underlineErrors; 
-			}
-			set {
-				if (underlineErrors.Set (value))
 					OnChanged (EventArgs.Empty);
 			}
 		}
@@ -754,6 +748,17 @@ namespace MonoDevelop.Ide.Editor
 			}
 			set {
 				if (includeWhitespaces.Set (value))
+					OnChanged (EventArgs.Empty);
+			}
+		}
+
+		ConfigurationProperty<bool> smartBackspace = ConfigurationProperty.Create ("SmartBackspace", true);
+		public bool SmartBackspace{
+			get {
+				return smartBackspace;
+			}
+			set {
+				if (smartBackspace.Set (value))
 					OnChanged (EventArgs.Empty);
 			}
 		}

@@ -54,6 +54,18 @@ namespace MonoDevelop.Components
 			base.OnDragBegin (context);
 		}
 
+		protected override void OnRowActivated (Gtk.TreePath path, Gtk.TreeViewColumn column)
+		{
+			// This is to work around an issue in ContextMenuTreeView, when we set the
+			// SelectFunction to block selection then it doesn't seem to always get
+			// properly unset.
+			//   https://bugzilla.xamarin.com/show_bug.cgi?id=40469
+			this.Selection.SelectFunction = (s, m, p, b) => {
+				return true;
+			};
+			base.OnRowActivated (path, column);
+		}
+
 		protected override bool OnButtonPressEvent (Gdk.EventButton evnt)
 		{
 			selectOnRelease = false;
@@ -76,6 +88,10 @@ namespace MonoDevelop.Components
 						//Always returning false means we are blocking base.OnButtonPressEvent
 						//from doing any changes to selectiong we will do changes in OnButtonReleaseEvent
 						return false;
+					};
+				} else {
+					this.Selection.SelectFunction = (s, m, p, b) => {
+						return true;
 					};
 				}
 				return base.OnButtonPressEvent (evnt);

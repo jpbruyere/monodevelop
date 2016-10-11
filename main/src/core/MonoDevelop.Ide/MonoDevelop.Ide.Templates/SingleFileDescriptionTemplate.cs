@@ -243,7 +243,7 @@ namespace MonoDevelop.Ide.Templates
 			}
 			
 			if (fileName == null)
-				throw new InvalidOperationException ("File name not provided in template");
+				throw new InvalidOperationException (GettextCatalog.GetString ("File name not provided in template"));
 			
 			//give it an extension if it didn't get one (compatibility with pre-substition behaviour)
 			if (Path.GetExtension (fileName).Length == 0) {
@@ -314,9 +314,11 @@ namespace MonoDevelop.Ide.Templates
 				var lineText = doc.GetTextAt (line.Offset, line.Length);
 				if (tabToSpaces != null)
 					lineText = lineText.Replace ("\t", tabToSpaces);
-				data = System.Text.Encoding.UTF8.GetBytes (lineText);
-				ms.Write (data, 0, data.Length);
-				ms.Write (eolMarkerBytes, 0, eolMarkerBytes.Length);
+				if (line.LengthIncludingDelimiter > 0) {
+					data = System.Text.Encoding.UTF8.GetBytes (lineText);
+					ms.Write (data, 0, data.Length);
+					ms.Write (eolMarkerBytes, 0, eolMarkerBytes.Length);
+				}
 			}
 			
 			ms.Position = 0;
@@ -366,7 +368,7 @@ namespace MonoDevelop.Ide.Templates
 		{
 			var binding = LanguageBindingService.GetBindingPerLanguageName (language);
 			if (binding == null)
-				throw new InvalidOperationException ("Language '" + language + "' not found");
+				throw new InvalidOperationException (GettextCatalog.GetString ("Language '{0}' not found", language));
 			return binding;
 		}
 	}

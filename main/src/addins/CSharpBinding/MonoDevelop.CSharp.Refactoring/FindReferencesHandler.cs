@@ -39,6 +39,8 @@ using MonoDevelop.Ide.Tasks;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using ICSharpCode.NRefactory6.CSharp;
+using Microsoft.CodeAnalysis.CSharp;
+using MonoDevelop.CSharp.Highlighting;
 
 namespace MonoDevelop.CSharp.Refactoring
 {
@@ -55,6 +57,9 @@ namespace MonoDevelop.CSharp.Refactoring
 				try {
 					var antiDuplicatesSet = new HashSet<SearchResult> (new SearchResultComparer ());
 					foreach (var loc in symbol.Locations) {
+						if (monitor.CancellationToken.IsCancellationRequested)
+							return;
+
 						if (!loc.IsInSource)
 							continue;
 						var fileName = loc.SourceTree.FilePath;
@@ -65,13 +70,16 @@ namespace MonoDevelop.CSharp.Refactoring
 							fileName = projectedName;
 							offset = projectedOffset;
 						}
-						var sr = new SearchResult (new FileProvider (fileName), offset, loc.SourceSpan.Length);
+						var sr = new MemberReference (symbol, fileName, offset, loc.SourceSpan.Length);
+						sr.ReferenceUsageType = ReferenceUsageType.Declariton;
 						antiDuplicatesSet.Add (sr);
 						monitor.ReportResult (sr);
 					}
 
-					foreach (var mref in await SymbolFinder.FindReferencesAsync (symbol, solution).ConfigureAwait (false)) {
+					foreach (var mref in await SymbolFinder.FindReferencesAsync (symbol, solution, monitor.CancellationToken).ConfigureAwait (false)) {
 						foreach (var loc in mref.Locations) {
+							if (monitor.CancellationToken.IsCancellationRequested)
+								return;
 							var fileName = loc.Document.FilePath;
 							var offset = loc.Location.SourceSpan.Start;
 							string projectedName;
@@ -80,12 +88,19 @@ namespace MonoDevelop.CSharp.Refactoring
 								fileName = projectedName;
 								offset = projectedOffset;
 							}
-							var sr = new SearchResult (new FileProvider (fileName), offset, loc.Location.SourceSpan.Length);
+							var sr = new MemberReference (symbol, fileName, offset, loc.Location.SourceSpan.Length);
 							if (antiDuplicatesSet.Add (sr)) {
+
+								var root = loc.Location.SourceTree.GetRoot ();
+								var node = root.FindNode (loc.Location.SourceSpan);
+								var trivia = root.FindTrivia (loc.Location.SourceSpan.Start);
+								sr.ReferenceUsageType = HighlightUsagesExtension.GetUsage (node);
+
 								monitor.ReportResult (sr);
 							}
 						}
 					}
+				} catch (OperationCanceledException) {
 				} catch (Exception ex) {
 					if (monitor != null)
 						monitor.ReportError ("Error finding references", ex);

@@ -163,11 +163,12 @@ namespace MonoDevelop.Ide.Editor
 			endOffset = StartOffset + 1;
 		}
 
-		public override void AfterBackspace ()
+		public override void BeforeBackspace (out bool handledCommand)
 		{
-			if (Editor.CaretOffset == StartOffset) {
+			if (Editor.CaretOffset == StartOffset +  1) {
 				Editor.EndSession ();
 			}
+			base.BeforeBackspace (out handledCommand);
 		}
 
 		public override void AfterDelete ()

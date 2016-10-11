@@ -1362,5 +1362,127 @@ namespace Test40018
 			Assert.IsNotNull (provider, "provider was not created.");
 			Assert.AreEqual (3, provider.Count);
 		}
+
+		/// <summary>
+		/// Bug 41245 - Attribute code completion not showing all constructors and showing too many things
+		/// </summary>
+		[Test]
+		public void TestBug41245 ()
+		{
+			var provider = CreateProvider (
+				@"
+using System;
+
+namespace cp654fz7
+{
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Parameter, AllowMultiple = false)]
+	public sealed class JsonPropertyAttribute : Attribute
+	{
+		internal bool? _isReference;
+		internal int? _order;
+		public bool IsReference
+		{
+			get { return _isReference ?? default(bool); }
+			set { _isReference = value; }
+		}
+		public int Order
+		{
+			get { return _order ?? default(int); }
+			set { _order = value; }
+		}
+		public string PropertyName { get; set; }
+		public JsonPropertyAttribute()
+		{
+		}
+
+		public JsonPropertyAttribute(string propertyName)
+		{
+			PropertyName = propertyName;
+		}
+	}
+
+	class MainClass
+	{
+		[JsonProperty($$)]
+		public object MyProperty { get; set; }
+
+		public static void Main(string[] args)
+		{
+		}
+	}
+}
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (2, provider.Count);
+		}
+
+
+		/// <summary>
+		/// Bug 41351 - No arguments code completion for methods called via ?. operator
+		/// </summary>
+		[Test]
+		public void TestBug41351 ()
+		{
+			var provider = CreateProvider (
+				@"
+using System;
+
+class test
+{
+	public event EventHandler Handler;
+
+	public test()
+	{
+		Handler?.Invoke($$);
+	}
+}
+
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (1, provider.Count);
+		}
+
+		/// <summary>
+		/// Bug 42952 - Parameter info not working for extension methods in different namespace
+		/// </summary>
+		[Test]
+		public void TestBug42952 ()
+		{
+			var provider = CreateProvider (
+				@"
+using System;
+using DifferentNamespace.ha;
+
+namespace parametersInfoBug
+{
+    class MainClass
+    {
+        public static void Main(string[] args)
+        {
+            new Class1().Test1($$);
+        }
+    }
+}
+
+
+namespace DifferentNamespace.ha
+{
+    public static class Extensions
+    {
+        public static void Test1(this Class1 class1, string stringParam)
+        {
+
+        }
+    }
+
+    public class Class1
+    {
+
+    }
+}
+");
+			Assert.IsNotNull (provider, "provider was not created.");
+			Assert.AreEqual (1, provider.Count);
+		}
 	}
 }

@@ -60,6 +60,21 @@ namespace MonoDevelop.Projects
 			return next.SupportsFlavor (guid);
 		}
 
+		internal protected virtual ProjectRunConfiguration OnCreateRunConfiguration (string name)
+		{
+			return next.OnCreateRunConfiguration (name);
+		}
+
+		internal protected virtual void OnReadRunConfiguration (ProgressMonitor monitor, ProjectRunConfiguration config, IPropertySet properties)
+		{
+			next.OnReadRunConfiguration (monitor, config, properties);
+		}
+
+		internal protected virtual void OnWriteRunConfiguration (ProgressMonitor monitor, ProjectRunConfiguration config, IPropertySet properties)
+		{
+			next.OnWriteRunConfiguration (monitor, config, properties);
+		}
+
 		internal protected virtual Task<TargetEvaluationResult> OnRunTarget (ProgressMonitor monitor, string target, ConfigurationSelector configuration, TargetEvaluationContext context)
 		{
 			return next.OnRunTarget (monitor, target, configuration, context);
@@ -104,7 +119,7 @@ namespace MonoDevelop.Projects
 		internal protected virtual void OnReadProject (ProgressMonitor monitor, MSBuildProject msproject)
 		{
 			next.OnReadProject (monitor, msproject);
-			msproject.GetGlobalPropertyGroup ().ReadObjectProperties (this, GetType (), true);
+			msproject.EvaluatedProperties.ReadObjectProperties (this, GetType (), true);
 			msproject.ReadExternalProjectProperties (this, GetType (), true);
 		}
 

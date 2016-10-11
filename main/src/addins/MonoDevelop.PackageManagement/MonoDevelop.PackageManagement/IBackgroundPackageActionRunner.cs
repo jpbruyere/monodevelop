@@ -26,18 +26,19 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.PackageManagement;
+using System.Threading.Tasks;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement
 {
 	internal interface IBackgroundPackageActionRunner
 	{
-		IEnumerable<InstallPackageAction> PendingInstallActions { get; }
-		IEnumerable<InstallPackageAction> PendingInstallActionsForProject (DotNetProject project);
+		IEnumerable<IInstallNuGetPackageAction> PendingInstallActions { get; }
+		IEnumerable<IInstallNuGetPackageAction> PendingInstallActionsForProject (DotNetProject project);
 
 		void Run (ProgressMonitorStatusMessage progressMessage, IPackageAction action);
 		void Run (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions);
+		Task RunAsync (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions);
 
 		void ShowError (ProgressMonitorStatusMessage progressMessage, Exception exception);
 		void ShowError (ProgressMonitorStatusMessage progressMessage, string message);

@@ -77,7 +77,7 @@ namespace MonoDevelop.Projects
 		
 		public string Command {
 			get { return command; }
-			set { command = value; }
+			set { command = value ?? string.Empty; }
 		}
 		
 		public string WorkingDir {
@@ -276,7 +276,7 @@ namespace MonoDevelop.Projects
 					oper = context.ExecutionHandler.Execute (cmd, console);
 				} else {
 					if (externalConsole) {
-						console = context.ExternalConsoleFactory.CreateConsole (!pauseExternalConsole, monitor.CancellationToken);
+						console = ExternalConsoleFactory.Instance.CreateConsole (!pauseExternalConsole, monitor.CancellationToken);
 						oper = Runtime.ProcessService.StartConsoleProcess (cmd.Command, cmd.Arguments,
 							cmd.WorkingDirectory, console, null);
 					} else {
@@ -292,7 +292,7 @@ namespace MonoDevelop.Projects
 				stopper.Dispose ();
 
 				if (oper.ExitCode != 0) {
-					monitor.ReportError ("Custom command failed (exit code: " + oper.ExitCode + ")", null);
+					monitor.ReportError (GettextCatalog.GetString ("Custom command failed (exit code: {0})", oper.ExitCode), null);
 				}
 			} catch (Win32Exception w32ex) {
 				monitor.ReportError (GettextCatalog.GetString ("Failed to execute custom command '{0}': {1}",

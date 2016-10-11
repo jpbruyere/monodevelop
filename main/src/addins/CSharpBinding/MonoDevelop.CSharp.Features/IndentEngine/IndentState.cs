@@ -201,7 +201,6 @@ namespace ICSharpCode.NRefactory6.CSharp
 				while (NextLineIndent.CurIndent - ThisLineIndent.CurIndent > delta &&
 					   NextLineIndent.PopIf(IndentType.Continuation));
 				ThisLineIndent = NextLineIndent.Clone();
-
 			}
 		}
 
@@ -294,17 +293,17 @@ namespace ICSharpCode.NRefactory6.CSharp
 			base.Push(ch);
 			switch (ch) {
 				case '#':
-					if (Engine.isLineStart)
-						ChangeState<PreProcessorState>();
-					break;
+				if (Engine.isLineStart)
+					ChangeState<PreProcessorState> ();
+				break;
 				case '/':
-					if (Engine.previousChar == '/')
-						ChangeState<LineCommentState>();
-					break;
+				if (Engine.previousChar == '/')
+					ChangeState<LineCommentState> ();
+				break;
 				case '*':
-					if (Engine.previousChar == '/')
-						ChangeState<MultiLineCommentState>();
-					break;
+				if (Engine.previousChar == '/')
+					ChangeState<MultiLineCommentState> ();
+				break;
 				case '"':
 					if (Engine.previousChar == '@')
 					{
@@ -481,7 +480,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 				if (true /*Engine.options.AlignToMemberReferenceDot*/ && !Engine.isLineStart)
 				{
 					IsMemberReferenceDotHandled = true;
-					NextLineIndent.RemoveAlignment();
+					NextLineIndent.RemoveAlignment ();
 					NextLineIndent.SetAlignment(Engine.column - NextLineIndent.CurIndent - 1, true);
 				}
 				else if (Engine.isLineStart)
@@ -503,6 +502,10 @@ namespace ICSharpCode.NRefactory6.CSharp
 			else if (ch == Engine.newLineChar)
 			{
 				PreviousLineIndent = ThisLineIndent.CurIndent;
+			}
+			else if (ch == ',') {
+				if (IsMemberReferenceDotHandled)
+					NextLineIndent.RemoveAlignment ();
 			}
 
 			if (Engine.wordToken.ToString() == "else")
@@ -1859,6 +1862,7 @@ namespace ICSharpCode.NRefactory6.CSharp
 			if (ch == '/' && Engine.previousChar == '*' && IsAnyCharPushed)
 			{
 				ExitState();
+				Engine.currentChar = '\0';
 			}
 
 			IsAnyCharPushed = true;

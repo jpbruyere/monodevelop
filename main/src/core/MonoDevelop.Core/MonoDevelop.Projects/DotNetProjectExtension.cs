@@ -72,7 +72,7 @@ namespace MonoDevelop.Projects
 			return next.OnGetDefaultTargetPlatform (projectCreateInfo);
 		}
 
-		internal protected virtual Task<List<string>> OnGetReferencedAssemblies (ConfigurationSelector configuration)
+		internal protected virtual Task<List<AssemblyReference>> OnGetReferencedAssemblies (ConfigurationSelector configuration)
 		{
 			return next.OnGetReferencedAssemblies (configuration);
 		}
@@ -82,9 +82,15 @@ namespace MonoDevelop.Projects
 			return next.OnGetReferencedAssemblyProjects (configuration);
 		}
 
+		[Obsolete("User overload that takes a RunConfiguration")]
 		internal protected virtual ExecutionCommand OnCreateExecutionCommand (ConfigurationSelector configSel, DotNetProjectConfiguration configuration)
 		{
 			return next.OnCreateExecutionCommand (configSel, configuration);
+		}
+
+		internal protected virtual ExecutionCommand OnCreateExecutionCommand (ConfigurationSelector configSel, DotNetProjectConfiguration configuration, ProjectRunConfiguration runConfiguration)
+		{
+			return next.OnCreateExecutionCommand (configSel, configuration, runConfiguration);
 		}
 
 		internal protected virtual void OnReferenceRemovedFromProject (ProjectReferenceEventArgs e)

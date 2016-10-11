@@ -5,6 +5,7 @@
 	<ConditionType id="Platform" type="MonoDevelop.Core.AddIns.PlatformCondition" />
 	<ConditionType id="AssemblyInstalled" type="MonoDevelop.Core.AddIns.AssemblyInstalledCondition" />
 	<ConditionType id="MSBuildTargetIsAvailable" type="MonoDevelop.Projects.MSBuild.TargetsAvailableCondition" />
+	<ConditionType id="Branding" type="MonoDevelop.Core.AddIns.BrandingCondition" />
 
 	
 	<!-- Extension points -->
@@ -159,8 +160,9 @@
 	
 	
 	<Extension path = "/MonoDevelop/Core/ExecutionModes">
-<!--		<Mode id="Default" _name="Default" class="MonoDevelop.Core.Execution.DefaultExecutionHandlerFactory"/>-->
-		<ModeSetType class="MonoDevelop.Core.Assemblies.CustomRuntimeExecutionModeSet"/>
+		<ModeSet id="Run" _name="Run" />
+		<ModeSet id="Debug" _name="Debug" />
+		<ModeSet id="Profile" _name="Profile" />
 	</Extension>
 	
 	<Extension path = "/MonoDevelop/Core/Runtimes">

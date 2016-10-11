@@ -90,6 +90,7 @@ namespace MonoDevelop.Ide.Editor.Extension
 
 		CancellationTokenSource completionTokenSrc = new CancellationTokenSource ();
 		CancellationTokenSource parameterHintingSrc = new CancellationTokenSource ();
+		bool parameterHingtingCursorPositionChanged = false;
 
 		// When a key is pressed, and before the key is processed by the editor, this method will be invoked.
 		// Return true if the key press should be processed by the editor.
@@ -125,6 +126,8 @@ namespace MonoDevelop.Ide.Editor.Extension
 				deleteOrBackspaceTriggerChar = Editor.GetCharAt (Editor.CaretOffset - 1);
 			
 			res = base.KeyPress (descriptor);
+			if (descriptor.KeyChar == (char)16 || descriptor.KeyChar == (char)17)
+				return res;
 
 			CompletionWindowManager.PostProcessKeyEvent (descriptor);
 
@@ -253,24 +256,30 @@ namespace MonoDevelop.Ide.Editor.Extension
 
 			if (CompletionWidget != null) {
 				CodeCompletionContext ctx = CompletionWidget.CurrentCodeCompletionContext;
-				parameterHintingSrc.Cancel ();
-				parameterHintingSrc = new CancellationTokenSource ();
-				var token = parameterHintingSrc.Token;
+				var newparameterHintingSrc = new CancellationTokenSource ();
+				var token = newparameterHintingSrc.Token;
 				try {
 					var task = HandleParameterCompletionAsync (ctx, descriptor.KeyChar, token);
 					if (task != null) {
+						parameterHintingSrc.Cancel ();
+						parameterHintingSrc = newparameterHintingSrc;
+						parameterHingtingCursorPositionChanged = false;
 						task.ContinueWith (t => {
-							if (!token.IsCancellationRequested && t.Result != null)
+							if (!token.IsCancellationRequested && t.Result != null) {
 								ParameterInformationWindowManager.ShowWindow (this, CompletionWidget, ctx, t.Result);
-						}, Runtime.MainTaskScheduler);
+								if (parameterHingtingCursorPositionChanged)
+									ParameterInformationWindowManager.UpdateCursorPosition (this, CompletionWidget);
+							}
+						}, token, TaskContinuationOptions.None, Runtime.MainTaskScheduler);
+					} else {
+						//Key was typed that was filtered out, no heavy processing will be performed(task==null)
+						//but we still want to update ParameterInfo window to avoid displaying it outside method call
+						parameterHingtingCursorPositionChanged = true;
 					}
 				} catch (TaskCanceledException) {
 				} catch (AggregateException) {
 				}
-
 			}
-			/*			autoHideCompletionWindow = true;
-						autoHideParameterWindow = keyChar != ':';*/
 			return res;
 		}
 
@@ -351,7 +360,8 @@ namespace MonoDevelop.Ide.Editor.Extension
 			}
 		}
 
-		[CommandHandler(TextEditorCommands.ShowCodeTemplateWindow)]
+		[CommandHandler (TextEditorCommands.ShowCodeTemplateWindow)]
+		[CommandHandler (TextEditorCommands.ShowCodeSurroundingsWindow)]
 		public virtual void RunShowCodeTemplatesWindow ()
 		{
 			ICompletionDataList completionList = null;
@@ -375,22 +385,46 @@ namespace MonoDevelop.Ide.Editor.Extension
 		[CommandUpdateHandler(TextEditorCommands.ShowCodeTemplateWindow)]
 		internal void OnUpdateShowCodeTemplatesWindow (CommandInfo info)
 		{
-			ICompletionDataList completionList = null;
-			int cpos, wlen;
-			if (!GetCompletionCommandOffset (out cpos, out wlen)) {
-				cpos = Editor.CaretOffset;
-				wlen = 0;
-			}
-			try {
-				var ctx = CompletionWidget.CreateCodeCompletionContext (cpos);
-				ctx.TriggerWordLength = wlen;
-				completionList = Editor.IsSomethingSelected ? ShowCodeSurroundingsCommand (ctx) : ShowCodeTemplatesCommand (ctx);
+			info.Enabled = !Editor.IsSomethingSelected;
+			info.Bypass = !info.Enabled;
+			if (info.Enabled) {
+				int cpos, wlen;
+				if (!GetCompletionCommandOffset (out cpos, out wlen)) {
+					cpos = Editor.CaretOffset;
+					wlen = 0;
+				}
+				try {
+					var ctx = CompletionWidget.CreateCodeCompletionContext (cpos);
+					ctx.TriggerWordLength = wlen;
 
-				info.Bypass = completionList == null;
-				info.Text = Editor.IsSomethingSelected ? GettextCatalog.GetString ("_Surround With...") : GettextCatalog.GetString ("I_nsert Template...");
-			} catch (Exception e) {
-				LoggingService.LogError ("Error while update show code templates window", e);
-				info.Bypass = true;
+					info.Bypass = ShowCodeTemplatesCommand (ctx) == null;
+				} catch (Exception e) {
+					LoggingService.LogError ("Error while update show code templates window", e);
+					info.Bypass = true;
+				}
+			}
+		}
+
+		[CommandUpdateHandler (TextEditorCommands.ShowCodeSurroundingsWindow)]
+		internal void OnUpdateSelectionSurroundWith (CommandInfo info)
+		{
+			info.Enabled = Editor.IsSomethingSelected;
+			info.Bypass = !info.Enabled;
+			if (info.Enabled) {
+				int cpos, wlen;
+				if (!GetCompletionCommandOffset (out cpos, out wlen)) {
+					cpos = Editor.CaretOffset;
+					wlen = 0;
+				}
+				try {
+					var ctx = CompletionWidget.CreateCodeCompletionContext (cpos);
+					ctx.TriggerWordLength = wlen;
+
+					info.Bypass = ShowCodeSurroundingsCommand (ctx) == null;
+				} catch (Exception e) {
+					LoggingService.LogError ("Error while update show code surroundings window", e);
+					info.Bypass = true;
+				}
 			}
 		}
 

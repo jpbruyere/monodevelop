@@ -47,6 +47,7 @@ namespace MonoDevelop.Projects.MSBuild
 
 		public int ReferenceCount { get; set; }
 		public DateTime ReleaseTime { get; set; }
+		public SemaphoreSlim Semaphore { get; } = new SemaphoreSlim (1, 1);
 		
 		public RemoteBuildEngine (Process proc, IBuildEngine engine)
 		{
@@ -182,7 +183,7 @@ namespace MonoDevelop.Projects.MSBuild
 	{
 		RemoteBuildEngine engine;
 		IProjectBuilder builder;
-		Dictionary<string,string[]> referenceCache;
+		Dictionary<string,AssemblyReference[]> referenceCache;
 		AsyncCriticalSection referenceCacheLock = new AsyncCriticalSection ();
 		string file;
 		static int lastTaskId;
@@ -192,7 +193,7 @@ namespace MonoDevelop.Projects.MSBuild
 			this.file = file;
 			this.engine = engine;
 			builder = engine.LoadProject (file);
-			referenceCache = new Dictionary<string, string[]> ();
+			referenceCache = new Dictionary<string, AssemblyReference[]> ();
 		}
 
 		public event EventHandler Disconnected;
@@ -263,9 +264,9 @@ namespace MonoDevelop.Projects.MSBuild
 			return t;
 		}
 
-		public async Task<string[]> ResolveAssemblyReferences (ProjectConfigurationInfo[] configurations, CancellationToken cancellationToken)
+		public async Task<AssemblyReference[]> ResolveAssemblyReferences (ProjectConfigurationInfo[] configurations, CancellationToken cancellationToken)
 		{
-			string[] refs = null;
+			AssemblyReference[] refs = null;
 			var id = configurations [0].Configuration + "|" + configurations [0].Platform;
 
 			using (await referenceCacheLock.EnterAsync ()) {
@@ -288,28 +289,31 @@ namespace MonoDevelop.Projects.MSBuild
 					cr = RegisterCancellation (cancellationToken, taskId);
 
 					MSBuildResult result;
+					bool locked = false;
 					try {
 						BeginOperation ();
-						lock (engine) {
-							// FIXME: This lock should not be necessary, but remoting seems to have problems when doing many concurrent calls.
-							result = builder.Run (
-										configurations, null, MSBuildVerbosity.Normal,
-										new [] { "ResolveAssemblyReferences" }, new [] { "ReferencePath" }, null, null, taskId
-									);
-						}
+						locked = await engine.Semaphore.WaitAsync (Timeout.Infinite, cancellationToken);
+						// FIXME: This lock should not be necessary, but remoting seems to have problems when doing many concurrent calls.
+						result = builder.Run (
+									configurations, null, MSBuildVerbosity.Normal,
+									new [] { "ResolveAssemblyReferences" }, new [] { "ReferencePath" }, null, null, taskId
+								);
 					} catch (Exception ex) {
 						CheckDisconnected ();
 						LoggingService.LogError ("ResolveAssemblyReferences failed", ex);
-						return new string [0];
+						return new AssemblyReference [0];
 					} finally {
+						if (locked)
+							engine.Semaphore.Release ();
 						EndOperation ();
 					}
 
 					List<MSBuildEvaluatedItem> items;
 					if (result.Items.TryGetValue ("ReferencePath", out items) && items != null) {
-						refs = items.Select (i => i.ItemSpec).ToArray ();
+						string aliases;
+						refs = items.Select (i => new AssemblyReference (i.ItemSpec, i.Metadata.TryGetValue ("Aliases", out aliases) ? aliases : "")).ToArray ();
 					} else
-						refs = new string[0];
+						refs = new AssemblyReference [0];
 
 					referenceCache [id] = refs;
 				}

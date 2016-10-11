@@ -40,6 +40,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using MonoDevelop.Ide.Editor;
 
 namespace MonoDevelop.CodeIssues
 {
@@ -48,13 +49,20 @@ namespace MonoDevelop.CodeIssues
 		static IEnumerable<CodeDiagnosticDescriptor> diagnostics;
 		static TraceListener consoleTraceListener = new ConsoleTraceListener ();
 
+		static bool SkipContext (DocumentContext ctx)
+		{
+			return (ctx.IsAdHocProject || !(ctx.Project is MonoDevelop.Projects.DotNetProject));
+		}
+
 		public static async Task<IEnumerable<Result>> Check (AnalysisDocument analysisDocument, CancellationToken cancellationToken)
 		{
 			var input = analysisDocument.DocumentContext;
 			if (!AnalysisOptions.EnableFancyFeatures || input.Project == null || !input.IsCompileableInProject || input.AnalysisDocument == null)
 				return Enumerable.Empty<Result> ();
+			if (SkipContext (input))
+				return Enumerable.Empty<Result> ();
 			try {
-				var model = input.ParsedDocument.GetAst<SemanticModel> ();
+				var model = await analysisDocument.DocumentContext.AnalysisDocument.GetSemanticModelAsync (cancellationToken);
 				if (model == null)
 					return Enumerable.Empty<Result> ();
 				var compilation = model.Compilation;
@@ -95,7 +103,6 @@ namespace MonoDevelop.CodeIssues
 						delegate (Exception exception, DiagnosticAnalyzer analyzer, Diagnostic diag) {
 							LoggingService.LogError ("Exception in diagnostic analyzer " + diag.Id + ":" + diag.GetMessage (), exception);
 						},
-						null, 
 						false, 
 						false
 					);

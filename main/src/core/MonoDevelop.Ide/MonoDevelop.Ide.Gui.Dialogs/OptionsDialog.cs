@@ -204,7 +204,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			DefaultHeight = 680;
 		}
 
-		void PixbufCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
+		static void PixbufCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			TreeIter parent;
 			bool toplevel = !model.IterParent (out parent, iter);
@@ -234,7 +234,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			}
 		}
 		
-		void TextCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
+		static void TextCellDataFunc (TreeViewColumn col, CellRenderer cell, TreeModel model, TreeIter iter)
 		{
 			TreeIter parent;
 			bool toplevel = !model.IterParent (out parent, iter);
@@ -296,7 +296,6 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				if (disp != null)
 					disp.Dispose ();
 			}
-			store.Dispose ();
 			base.OnDestroyed ();
 		}
 
@@ -332,7 +331,20 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				}
 			}
 		}
-		
+
+		internal void ExpandChildren (IOptionsPanel parent)
+		{
+			foreach (SectionPage page in pages.Values) {
+				foreach (PanelInstance pi in page.Panels) {
+					if (pi.Panel == parent) {
+						tree.ExpandToPath (store.GetPath (page.Iter));
+						tree.ExpandRow (store.GetPath (page.Iter), false);
+						return;
+					}
+				}
+			}
+		}
+
 		internal void AddChildSection (IOptionsPanel parent, OptionsDialogSection section, object dataObject)
 		{
 			foreach (SectionPage page in pages.Values) {
@@ -411,6 +423,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			TreeIter cit;
 			if (removeEmptySections && page.Panels.Count == 0 && !store.IterChildren (out cit, it)) {
 				store.Remove (ref it);
+				pages.Remove (section);
 				return TreeIter.Zero;
 			}
 			return it;
@@ -538,7 +551,7 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 				CreatePageWidget (page);
 
 			if (section.HeaderImage == null) {
-				labelTitle.Markup = "<span weight=\"bold\" size=\"large\">" + GLib.Markup.EscapeText (section.Label) + "</span>";
+				labelTitle.Markup = "<span weight=\"bold\" size=\"large\">" + GLib.Markup.EscapeText (section.HeaderLabel) + "</span>";
 				textHeader.Show ();
 				imageHeader.Hide ();
 			} else {
@@ -750,9 +763,14 @@ namespace MonoDevelop.Ide.Gui.Dialogs
 			// Validate changes before saving
 			if (!ValidateChanges ())
 				return;
-			
+
 			// Now save
-			ApplyChanges ();
+			try {
+				ApplyChanges ();
+			} catch (Exception ex) {
+				LoggingService.LogError ("Error saving options changes", ex);
+				MessageService.ShowError (null, GettextCatalog.GetString ("There was an error saving the changes"), null, null, false);
+			}
 
 			StoreLastPanel ();
 

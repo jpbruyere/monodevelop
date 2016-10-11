@@ -13,6 +13,8 @@ using off_t = System.Int64;
 using MonoDevelop.Projects.Text;
 using System.Threading;
 using System.Linq;
+using MonoDevelop.Ide;
+using System.Diagnostics;
 
 namespace MonoDevelop.VersionControl.Subversion.Unix
 {
@@ -198,11 +200,21 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			return new UnixSvnBackend ();
 		}
 
+		static bool FallbackProbeDirectoryDotSvn (FilePath path)
+		{
+			while (!path.IsNullOrEmpty) {
+				if (Directory.Exists (path.Combine (".svn")))
+					return true;
+				path = path.ParentDirectory;
+			}
+			return false;
+		}
+
 		public override string GetDirectoryDotSvn (FilePath path)
 		{
 			if (path.IsNullOrEmpty)
 				return string.Empty;
-
+			
 			if (Pre_1_7)
 				return base.GetDirectoryDotSvn (path);
 
@@ -1199,7 +1211,7 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			}
 			
 			switch (status) {
-			case LibSvnClient.svn_wc_status_kind.None: return VersionStatus.Versioned;
+			case LibSvnClient.svn_wc_status_kind.None: return VersionStatus.Unversioned;
 			case LibSvnClient.svn_wc_status_kind.Normal: return VersionStatus.Versioned;
 			case LibSvnClient.svn_wc_status_kind.Unversioned: return VersionStatus.Unversioned;
 			case LibSvnClient.svn_wc_status_kind.Modified: return VersionStatus.Versioned | VersionStatus.Modified;
@@ -1253,11 +1265,11 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 		static string BytesToSize (long kbytes)
 		{
 			if (kbytes < 1024)
-				return String.Format ("{0} KBytes", kbytes);
+				return GettextCatalog.GetString ("{0} KBytes", kbytes);
 			// 16 * 1024
 			if (kbytes < 16384)
-				return String.Format ("{0:0.0} MBytes", kbytes / 1024.0);
-			return String.Format ("{0} MBytes", kbytes / 1024);
+				return GettextCatalog.GetString ("{0:0.0} MBytes", kbytes / 1024.0);
+			return GettextCatalog.GetString ("{0} MBytes", kbytes / 1024);
 		}
 
 		ProgressData progressData;
@@ -1291,7 +1303,9 @@ namespace MonoDevelop.VersionControl.Subversion.Unix
 			progressData.LogTimer.Interval = 1000;
 			progressData.LogTimer.Elapsed += delegate {
 				progressData.Seconds += 1;
-				updatemonitor.Log.WriteLine (GettextCatalog.GetString ("Transferred {0} in {1} seconds.", BytesToSize (progressData.KBytes), progressData.Seconds));
+				Runtime.RunInMainThread (() => {
+					updatemonitor.Log.WriteLine (GettextCatalog.GetString ("Transferred {0} in {1} seconds.", BytesToSize (progressData.KBytes), progressData.Seconds));
+				});
 			};
 			progressData.LogTimer.Start ();
 		}

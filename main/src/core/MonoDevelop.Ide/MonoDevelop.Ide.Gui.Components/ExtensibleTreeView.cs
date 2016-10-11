@@ -43,6 +43,9 @@ using MonoDevelop.Ide.Gui.Pads;
 using MonoDevelop.Projects.Extensions;
 using System.Linq;
 using MonoDevelop.Ide.Tasks;
+using System.Runtime.CompilerServices;
+
+[assembly:InternalsVisibleTo("MonoDevelop.UnitTesting")]
 
 namespace MonoDevelop.Ide.Gui.Components
 {
@@ -299,7 +302,7 @@ namespace MonoDevelop.Ide.Gui.Components
 		}
 #endif
 
-		void SetIconCellData (Gtk.TreeViewColumn col, Gtk.CellRenderer renderer, Gtk.TreeModel model, Gtk.TreeIter it)
+		static void SetIconCellData (Gtk.TreeViewColumn col, Gtk.CellRenderer renderer, Gtk.TreeModel model, Gtk.TreeIter it)
 		{
 			if (model == null)
 				return;
@@ -317,7 +320,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			cell.OverlayTopRight = info.OverlayTopRight;
 		}
 
-		void SetTextCellData (Gtk.TreeViewColumn col, Gtk.CellRenderer renderer, Gtk.TreeModel model, Gtk.TreeIter it)
+		static void SetTextCellData (Gtk.TreeViewColumn col, Gtk.CellRenderer renderer, Gtk.TreeModel model, Gtk.TreeIter it)
 		{
 			if (model == null)
 				return;
@@ -327,6 +330,7 @@ namespace MonoDevelop.Ide.Gui.Components
 
 			cell.DisabledStyle = info.DisabledStyle;
 			cell.TextMarkup = info.Label;
+			cell.SecondaryTextMarkup = info.SecondaryLabel;
 
 			cell.StatusIcon = info.StatusIconInternal;
 		}
@@ -536,15 +540,6 @@ namespace MonoDevelop.Ide.Gui.Components
 		void HandleLeaveNotifyEvent (object o, Gtk.LeaveNotifyEventArgs args)
 		{
 			HideStatusMessage ();
-		}
-
-		void HandleMenuHidden (object sender, EventArgs e)
-		{
-			if (sender is Gtk.Menu) {
-				((Gtk.Menu)sender).Hidden -= HandleMenuHidden;
-			}
-			text_render.Pushed = false;
-			widget.QueueDraw ();
 		}
 
 		internal void LockUpdates ()
@@ -1357,7 +1352,7 @@ namespace MonoDevelop.Ide.Gui.Components
 
 			string nodeName = node.NodeName;
 
-			GetNodeInfo (iter).Label = nodeName;
+			GetNodeInfo (iter).Label = GLib.Markup.EscapeText (nodeName);
 			store.EmitRowChanged (store.GetPath (iter), iter);
 
 			// Get and validate the initial text selection
@@ -2131,7 +2126,6 @@ namespace MonoDevelop.Ide.Gui.Components
 
 			if (store != null) {
 				Clear ();
-				store.Dispose ();
 				store = null;
 			}
 
@@ -2355,6 +2349,7 @@ namespace MonoDevelop.Ide.Gui.Components
 			Gdk.Rectangle buttonScreenRect;
 			Gdk.Rectangle buttonAllocation;
 			string markup;
+			string secondarymarkup;
 
 			const int StatusIconSpacing = 4;
 
@@ -2381,7 +2376,25 @@ namespace MonoDevelop.Ide.Gui.Components
 			[GLib.Property ("text-markup")]
 			public string TextMarkup {
 				get { return markup; }
-				set { Markup = markup = value; }
+				set {
+					markup = value;
+					if (!string.IsNullOrEmpty (secondarymarkup))
+						Markup = markup + " " + secondarymarkup;
+					else
+						Markup = markup;
+				}
+			}
+
+			[GLib.Property ("secondary-text-markup")]
+			public string SecondaryTextMarkup {
+				get { return secondarymarkup; }
+				set {
+					secondarymarkup = value;
+					if (!string.IsNullOrEmpty (secondarymarkup))
+						Markup = markup + " " + secondarymarkup;
+					else
+						Markup = markup;
+				}
 			}
 
 			public bool DisabledStyle { get; set; }
@@ -2437,15 +2450,24 @@ namespace MonoDevelop.Ide.Gui.Components
 					layout.FontDescription = scaledFont;
 				}
 
+				string newmarkup = TextMarkup;
 				if (DisabledStyle) {
 					Gdk.Color fgColor;
-					if (Platform.IsMac && flags.HasFlag (Gtk.CellRendererState.Selected)) 
+					if (Platform.IsMac && flags.HasFlag (Gtk.CellRendererState.Selected))
 						fgColor = widget.Style.Text (IdeTheme.UserInterfaceTheme == Theme.Light ? Gtk.StateType.Selected : Gtk.StateType.Normal);
 					else
 						fgColor = widget.Style.Text (Gtk.StateType.Insensitive);
-					layout.SetMarkup ("<span foreground='" + fgColor.GetHex () + "'>" + TextMarkup + "</span>");
-				} else
-					layout.SetMarkup (TextMarkup);
+					newmarkup = "<span foreground='" + fgColor.GetHex () + "'>" + TextMarkup + "</span>";
+				}
+
+				if (!string.IsNullOrEmpty (SecondaryTextMarkup)) {
+					if (Platform.IsMac && flags.HasFlag (Gtk.CellRendererState.Selected))
+						newmarkup += " <span foreground='" + Styles.SecondarySelectionTextColor.ToHexString (false) + "'>" + SecondaryTextMarkup + "</span>";
+					else
+						newmarkup += " <span foreground='" + Styles.SecondaryTextColor.ToHexString (false) + "'>" + SecondaryTextMarkup + "</span>";
+				}
+
+				layout.SetMarkup (newmarkup);
 			}
 
 			protected override void Render (Gdk.Drawable window, Gtk.Widget widget, Gdk.Rectangle background_area, Gdk.Rectangle cell_area, Gdk.Rectangle expose_area, Gtk.CellRendererState flags)
@@ -2511,6 +2533,14 @@ namespace MonoDevelop.Ide.Gui.Components
 					var iconSize = GetZoomedIconSize (StatusIcon, zoom);
 					width += (int)iconSize.Width + StatusIconSpacing;
 				}
+			}
+
+			protected override void OnEditingStarted (Gtk.CellEditable editable, string path)
+			{
+				var entry = editable as Gtk.Entry;
+				if (entry != null && scaledFont != null)
+					entry.ModifyFont (scaledFont);
+				base.OnEditingStarted (editable, path);
 			}
 
 			public double Zoom {

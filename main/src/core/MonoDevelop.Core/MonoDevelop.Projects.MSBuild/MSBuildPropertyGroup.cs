@@ -38,7 +38,7 @@ namespace MonoDevelop.Projects.MSBuild
 {
 	public class MSBuildPropertyGroup: MSBuildElement, IMSBuildPropertySet, IMSBuildEvaluatedPropertyCollection
 	{
-		Dictionary<string,MSBuildProperty> properties = new Dictionary<string, MSBuildProperty> ();
+		Dictionary<string,MSBuildProperty> properties = new Dictionary<string, MSBuildProperty> (StringComparer.OrdinalIgnoreCase);
 
 		public MSBuildPropertyGroup ()
 		{
@@ -159,7 +159,11 @@ namespace MonoDevelop.Projects.MSBuild
 		
 		public IEnumerable<MSBuildProperty> GetProperties ()
 		{
-			return ChildNodes.OfType<MSBuildProperty> ();
+			foreach (var node in ChildNodes) {
+				var prop = node as MSBuildProperty;
+				if (prop != null)
+					yield return prop;
+			}
 		}
 
 		public string GetValue (string name, string defaultValue = null)
@@ -258,6 +262,11 @@ namespace MonoDevelop.Projects.MSBuild
 		}
 
 		internal IPropertyGroupListener PropertyGroupListener { get; set; }
+
+		internal void UnlinkFromProjectInstance ()
+		{
+			PropertyGroupListener = null;
+		}
 
 		MSBuildProperty FindExistingProperty (int index, int inc)
 		{
@@ -376,14 +385,6 @@ namespace MonoDevelop.Projects.MSBuild
 			properties.Remove (prop.Name);
 			ChildNodes = ChildNodes.Remove (prop);
 			NotifyChanged ();
-		}
-
-		internal void SetLoadedValues (IMSBuildPropertyGroupEvaluated loadedProps)
-		{
-			foreach (var p in GetProperties ()) {
-				var ep = loadedProps.GetProperty (p.Name);
-				p.InitEvaluatedValue (ep.Value);
-			}
 		}
 
 		internal void ResetIsNewFlags ()

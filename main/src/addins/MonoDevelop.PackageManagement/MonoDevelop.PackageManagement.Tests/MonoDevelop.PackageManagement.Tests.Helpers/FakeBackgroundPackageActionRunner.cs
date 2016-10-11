@@ -26,14 +26,14 @@
 
 using System;
 using System.Collections.Generic;
-using MonoDevelop.PackageManagement;
+using System.Threading.Tasks;
 using MonoDevelop.Projects;
 
 namespace MonoDevelop.PackageManagement.Tests.Helpers
 {
 	class FakeBackgroundPackageActionRunner : IBackgroundPackageActionRunner
 	{
-		public IEnumerable<InstallPackageAction> PendingInstallActionsForProject (DotNetProject project)
+		public IEnumerable<IInstallNuGetPackageAction> PendingInstallActionsForProject (DotNetProject project)
 		{
 			throw new NotImplementedException ();
 		}
@@ -68,11 +68,16 @@ namespace MonoDevelop.PackageManagement.Tests.Helpers
 			ShowErrorMessage = message;
 		}
 
+		public Task RunAsync (ProgressMonitorStatusMessage progressMessage, IEnumerable<IPackageAction> actions)
+		{
+			throw new NotImplementedException ();
+		}
+
 		public ProgressMonitorStatusMessage ShowErrorProgressMessage;
 		public string ShowErrorMessage;
 		public Exception ShowErrorException;
 
-		public IEnumerable<InstallPackageAction> PendingInstallActions {
+		public IEnumerable<IInstallNuGetPackageAction> PendingInstallActions {
 			get {
 				throw new NotImplementedException ();
 			}

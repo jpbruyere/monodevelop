@@ -29,14 +29,14 @@ gtk-toolbar-icon-size = large-toolbar
 gtk-auto-mnemonics = 1
 gtk-error-bell = 0
 gtk-show-input-method-menu = 0
-gtk-font-name = "Helvetica Neue 12"
+gtk-font-name = "-apple-system-font 12"
 
 
 style "default" {
     xthickness = 1
     ythickness = 1
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     ### colours
 
@@ -135,7 +135,7 @@ style "button" = "default" {
     xthickness = 2
     ythickness = 4
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     bg[NORMAL] = @base_color
     bg[PRELIGHT] = @base_color # Mac buttons have no hover state
@@ -177,7 +177,7 @@ style "menu" {
     xthickness = 1
     # ythickness = 0
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     bg[PRELIGHT] = @selected_fg_color
     fg[PRELIGHT] = @selected_fg_color
@@ -232,7 +232,7 @@ style "tooltip"
     bg[NORMAL] = @tooltip_bg_color
     bg[SELECTED] = @tooltip_border_color
 
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 
     engine "xamarin" {
         roundness = 0
@@ -241,9 +241,7 @@ style "tooltip"
 
 style "treeview" = "default"
 {
-    base[SELECTED] = @selected_bg_color
-    base[ACTIVE] = @selected_bg_color
-    text[SELECTED] = @selected_fg_color
+    base[ACTIVE] = "#a0a0a0"
     text[ACTIVE] = @selected_fg_color
 
     engine "xamarin" {
@@ -318,7 +316,7 @@ style "wizard-dialog"
 }
 
 style "combo-box-menu" = "menu" {
-    font_name = "Helvetica Neue 12"
+    font_name = "-apple-system-font 12"
 }
 
 style "notebook" = "default"
@@ -334,24 +332,27 @@ style "notebook" = "default"
     }
 }
 
-style "radio-or-check-box" = "default"
+style "radio-or-check-box" = "button"
 {
-    ythickness = 6
+    GtkCheckButton::indicator-size = 17
+    base[ACTIVE] = "#419bf9"
+    base[SELECTED] = "#419bf9"
+    base[PRELIGHT] = @base_color
+    text[ACTIVE] = @base_color
+    text[SELECTED] = @base_color
+    text[PRELIGHT] = @base_color
+    text[NORMAL] = @base_color
 
-    engine "quartz" {
+    engine "xamarin" {
+        focusstyle = 0
+        border_shades = { 1.0, 1.0 }
     }
 }
 
 style "propertygrid-radio-or-check-box" = "radio-or-check-box"
 {
-    base[ACTIVE] = @base_color
-    base[SELECTED] = @base_color
-    base[PRELIGHT] = @base_color
-    text[SELECTED] = @fg_color
     GtkCheckButton::indicator-spacing = 0
-
-    engine "xamarin" {
-    }
+    GtkCheckButton::indicator-size = 15
 }
 
 style "entry" = "default"
