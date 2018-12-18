@@ -11,8 +11,8 @@
 	branch = vs-8.0-v0.26.8
 [submodule "main/external/libgit2"]
 	path = main/external/libgit2
-	url = git://github.com/mono/libgit2.git
-	branch = vs-8.0-v0.26.8
+	url = git://github.com/libgit2/libgit2.git
+	branch = master
 [submodule "main/external/libgit2sharp"]
 	path = main/external/libgit2sharp
 	url = git://github.com/mono/libgit2sharp.git
@@ -36,7 +36,6 @@
 [submodule "main/external/nuget-binary"]
 	path = main/external/nuget-binary
 	url = git://github.com/mono/nuget-binary.git
-	branch = master
 [submodule "main/external/RefactoringEssentials"]
 	path = main/external/RefactoringEssentials
 	url = git://github.com/mono/RefactoringEssentials.git
